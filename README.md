@@ -5,6 +5,7 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 ## Key Features
 
 - **Meals module**: add meal-plan product settings like meals per week, meal selection rules, and meal metadata.
+- **Frontend entry pages**: shortcode-based public containers for `[restaurant_order_meals]`, `[restaurant_meal_plans]`, and `[restaurant_catering]`.
 - **Subscriptions module**: create subscription records from checkout orders, support customer pause/resume/cancel actions, and process renewal scheduling.
 - **Catering module**: capture catering requests via shortcode form, manage requests in admin, and convert approved requests into WooCommerce orders.
 - **Delivery module**: collect delivery date/time-slot checkout fields and manage delivery schedules from the admin dashboard.
@@ -21,11 +22,15 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 - `includes/class-deactivator.php` - Deactivation routines.
 - `includes/modules/class-module-interface.php` - Module contract.
 - `includes/modules/class-abstract-module.php` - Shared module base class.
+- `includes/modules/class-public-module.php` - Frontend shortcodes module hooks.
 - `includes/modules/class-meals-module.php` - Meals module hooks.
 - `includes/modules/class-subscriptions-module.php` - Subscriptions module hooks.
 - `includes/modules/class-catering-module.php` - Catering module hooks.
 - `includes/modules/class-delivery-module.php` - Delivery module hooks.
 - `includes/modules/class-emails-module.php` - WooCommerce custom email hooks.
+- `includes/public/class-order-meals-page.php` - `[restaurant_order_meals]` renderer.
+- `includes/public/class-meal-plans-page.php` - `[restaurant_meal_plans]` renderer.
+- `includes/public/class-catering-page.php` - `[restaurant_catering]` renderer.
 - `scripts/integration-smoke-check.sh` - Loader and registration smoke checks.
 - `index.php` - Direct access protection.
 

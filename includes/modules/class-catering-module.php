@@ -336,10 +336,12 @@ class Catering_Module extends Abstract_Module {
 				'edit_others_posts'  => 'manage_options',
 				'publish_posts'      => 'manage_options',
 				'read_private_posts' => 'manage_options',
-				'read_post'          => 'manage_options',
-				'edit_post'          => 'manage_options',
-				'delete_post'        => 'manage_options',
 				'delete_posts'       => 'manage_options',
+				'delete_private_posts'   => 'manage_options',
+				'delete_published_posts' => 'manage_options',
+				'delete_others_posts'    => 'manage_options',
+				'edit_private_posts'     => 'manage_options',
+				'edit_published_posts'   => 'manage_options',
 			),
 			'map_meta_cap'        => true,
 			'menu_icon'           => 'dashicons-clipboard',
@@ -354,6 +356,15 @@ class Catering_Module extends Abstract_Module {
 	 * @return void
 	 */
 	public function add_catering_admin_meta_boxes() {
+		add_meta_box(
+			'catering_structured_request',
+			esc_html__( 'Structured Request Data', 'restaurant-food-services' ),
+			array( $this, 'render_structured_request_meta_box' ),
+			'catering_request',
+			'normal',
+			'default'
+		);
+
 		add_meta_box(
 			'catering_menu_items',
 			esc_html__( 'Menu Items', 'restaurant-food-services' ),
@@ -371,6 +382,43 @@ class Catering_Module extends Abstract_Module {
 			'side',
 			'high'
 		);
+	}
+
+	/**
+	 * Renders structured wizard request data.
+	 *
+	 * @param \WP_Post $post Post object.
+	 *
+	 * @return void
+	 */
+	public function render_structured_request_meta_box( $post ) {
+		$event_type           = sanitize_text_field( (string) get_post_meta( $post->ID, 'event_type', true ) );
+		$event_date           = sanitize_text_field( (string) get_post_meta( $post->ID, 'event_date', true ) );
+		$guest_count          = absint( get_post_meta( $post->ID, 'guest_count', true ) );
+		$location             = sanitize_text_field( (string) get_post_meta( $post->ID, 'location', true ) );
+		$selected_items_json  = (string) get_post_meta( $post->ID, 'selected_items', true );
+		$serving_style        = sanitize_text_field( (string) get_post_meta( $post->ID, 'serving_style', true ) );
+		$dietary_requirements = sanitize_textarea_field( (string) get_post_meta( $post->ID, 'dietary_requirements', true ) );
+		$special_requests     = sanitize_textarea_field( (string) get_post_meta( $post->ID, 'special_requests', true ) );
+
+		if ( '' === $dietary_requirements ) {
+			$dietary_requirements = sanitize_textarea_field( (string) get_post_meta( $post->ID, 'dietary_needs', true ) );
+		}
+
+		echo '<table class="widefat striped" style="margin-top:10px">';
+		echo '<tbody>';
+		echo '<tr><th style="width:220px">' . esc_html__( 'Event Type', 'restaurant-food-services' ) . '</th><td>' . esc_html( $event_type ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Event Date', 'restaurant-food-services' ) . '</th><td>' . esc_html( $event_date ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Guest Count', 'restaurant-food-services' ) . '</th><td>' . esc_html( (string) $guest_count ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Location', 'restaurant-food-services' ) . '</th><td>' . esc_html( $location ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Serving Style', 'restaurant-food-services' ) . '</th><td>' . esc_html( $serving_style ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Dietary Requirements', 'restaurant-food-services' ) . '</th><td>' . nl2br( esc_html( $dietary_requirements ) ) . '</td></tr>';
+		echo '<tr><th>' . esc_html__( 'Special Requests', 'restaurant-food-services' ) . '</th><td>' . nl2br( esc_html( $special_requests ) ) . '</td></tr>';
+		echo '</tbody>';
+		echo '</table>';
+
+		echo '<p style="margin-top:12px"><strong>' . esc_html__( 'Selected Items (JSON)', 'restaurant-food-services' ) . '</strong></p>';
+		echo '<textarea readonly style="width:100%;min-height:120px;font-family:monospace;">' . esc_textarea( $selected_items_json ) . '</textarea>';
 	}
 
 	/**
@@ -472,7 +520,7 @@ class Catering_Module extends Abstract_Module {
 			<?php else : ?>
 				<p>
 					<a href="<?php echo esc_url( add_query_arg( array( 'action' => 'restaurant_convert_to_order', 'catering_id' => $post->ID, 'nonce' => wp_create_nonce( 'catering_convert_nonce' ) ) ) ); ?>" class="button button-primary" style="width: 100%; box-sizing: border-box;">
-						<?php esc_html_e( 'Convert to Order', 'restaurant-food-services' ); ?>
+									<?php esc_html_e( 'Convert to WooCommerce Order', 'restaurant-food-services' ); ?>
 					</a>
 				</p>
 			<?php endif; ?>

@@ -23,6 +23,7 @@ class Bootstrap {
 	 */
 	public static function init() {
 		add_action( 'plugins_loaded', array( __CLASS__, 'on_plugins_loaded' ) );
+		add_action( 'admin_notices', array( \Restaurant\FoodServices\Lifecycle_Notices::class, 'render' ) );
 	}
 
 	/**

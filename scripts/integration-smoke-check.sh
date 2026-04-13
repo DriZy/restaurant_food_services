@@ -5,6 +5,7 @@ PLUGIN_DIR="/Users/idristabi/Projects/wordpress/brenssmallchops/wp-content/plugi
 
 echo "[1/4] Checking module files are loaded by main plugin bootstrap..."
 required_includes=(
+  "includes/modules/class-public-module.php"
   "includes/modules/class-meals-module.php"
   "includes/modules/class-subscriptions-module.php"
   "includes/modules/class-catering-module.php"
@@ -20,6 +21,7 @@ done
 
 echo "[2/4] Checking all modules are instantiated in Plugin::load_modules()..."
 required_modules=(
+  "new Public_Module()"
   "new Emails_Module()"
   "new Meals_Module()"
   "new Subscriptions_Module()"
@@ -35,6 +37,7 @@ done
 
 echo "[3/4] Checking each module uses Loader in register_hooks()..."
 module_files=(
+  "$PLUGIN_DIR/includes/modules/class-public-module.php"
   "$PLUGIN_DIR/includes/modules/class-meals-module.php"
   "$PLUGIN_DIR/includes/modules/class-subscriptions-module.php"
   "$PLUGIN_DIR/includes/modules/class-catering-module.php"

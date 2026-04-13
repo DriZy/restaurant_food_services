@@ -62,6 +62,7 @@ class Activator {
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			user_id bigint(20) unsigned NOT NULL,
 			plan_id bigint(20) unsigned NOT NULL,
+			plan_type varchar(50) NOT NULL DEFAULT 'individual',
 			meals_per_week int(11) unsigned NOT NULL DEFAULT 0,
 			selected_meals longtext NULL,
 			delivery_days longtext NULL,

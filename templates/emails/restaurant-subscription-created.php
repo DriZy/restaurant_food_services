@@ -35,10 +35,10 @@ do_action( 'woocommerce_email_header', $email_heading, $email );
 	</thead>
 	<tbody>
 		<tr>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $subscription->plan_name ?? '' ); ?></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $subscription->meals_per_week ?? '' ); ?></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( ucfirst( $subscription->status ?? 'active' ) ); ?></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $subscription->next_order_date ?? '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $subscription->plan_name ) ? $subscription->plan_name : '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $subscription->meals_per_week ) ? $subscription->meals_per_week : '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( ucfirst( isset( $subscription->status ) ? $subscription->status : 'active' ) ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $subscription->next_order_date ) ? $subscription->next_order_date : '' ); ?></td>
 		</tr>
 	</tbody>
 </table>

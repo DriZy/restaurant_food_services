@@ -35,6 +35,7 @@ class Subscriptions_Module extends Abstract_Module {
 	public function register_hooks( Loader $loader ) {
 		parent::register_hooks( $loader );
 		$loader->add_action( 'init', $this, 'register_subscriptions_features' );
+		$loader->add_action( 'init', $this, 'ensure_subscriptions_table' );
 		$loader->add_action( 'init', $this, 'maybe_schedule_daily_cron' );
 		$loader->add_action( 'init', $this, 'register_my_subscriptions_endpoint' );
 		$loader->add_action( 'woocommerce_checkout_order_processed', $this, 'create_subscriptions_from_order' );
@@ -93,6 +94,8 @@ class Subscriptions_Module extends Abstract_Module {
 
 		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
 		$user_id    = (int) $order->get_user_id();
+		$created_count = 0;
+		$this->maybe_add_plan_type_column( $table_name );
 
 		foreach ( $order->get_items() as $item ) {
 			$product_id = (int) $item->get_product_id();
@@ -127,12 +130,99 @@ class Subscriptions_Module extends Abstract_Module {
 			);
 
 			if ( false !== $inserted && $wpdb->insert_id > 0 ) {
+				$created_count++;
 				do_action( 'restaurant_food_services_subscription_created', (int) $wpdb->insert_id );
 			}
 		}
 
+		if ( 0 === $created_count ) {
+			$this->create_subscription_from_meal_plan_order_meta( $order, $table_name, $user_id );
+		}
+
 		$order->update_meta_data( '_restaurant_subscriptions_created', 'yes' );
 		$order->save();
+	}
+
+	/**
+	 * Creates a subscription from meal plan wizard data stored in order meta.
+	 *
+	 * @param \WC_Order $order      WooCommerce order.
+	 * @param string    $table_name Subscriptions table name.
+	 * @param int       $user_id    User ID.
+	 *
+	 * @return void
+	 */
+	protected function create_subscription_from_meal_plan_order_meta( $order, $table_name, $user_id ) {
+		$selection_raw = $order->get_meta( '_restaurant_meal_plan_selection', true );
+
+		if ( ! is_string( $selection_raw ) || '' === $selection_raw ) {
+			return;
+		}
+
+		$selection = json_decode( $selection_raw, true );
+
+		if ( ! is_array( $selection ) ) {
+			return;
+		}
+
+		$selected_meals = isset( $selection['selected_meals'] ) && is_array( $selection['selected_meals'] ) ? array_map( 'absint', $selection['selected_meals'] ) : array();
+		$delivery_days  = isset( $selection['delivery_days'] ) && is_array( $selection['delivery_days'] ) ? array_map( 'sanitize_text_field', $selection['delivery_days'] ) : array();
+		$meals_per_week = isset( $selection['meals_per_week'] ) ? absint( $selection['meals_per_week'] ) : 0;
+		$plan_type      = isset( $selection['plan_type'] ) ? sanitize_text_field( $selection['plan_type'] ) : 'individual';
+
+		if ( empty( $selected_meals ) ) {
+			return;
+		}
+
+		if ( $meals_per_week <= 0 ) {
+			$meals_per_week = 1;
+		}
+
+		global $wpdb;
+
+		$inserted = $wpdb->insert(
+			$table_name,
+			array(
+				'user_id'         => $user_id,
+				'plan_id'         => 0,
+				'plan_type'       => $plan_type,
+				'meals_per_week'  => $meals_per_week,
+				'selected_meals'  => wp_json_encode( $selected_meals ),
+				'delivery_days'   => wp_json_encode( $delivery_days ),
+				'status'          => 'active',
+				'next_order_date' => $this->extract_next_order_date( $order ),
+				'created_at'      => current_time( 'mysql', true ),
+			),
+			array( '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
+		);
+
+		if ( false !== $inserted && $wpdb->insert_id > 0 ) {
+			do_action( 'restaurant_food_services_subscription_created', (int) $wpdb->insert_id );
+		}
+	}
+
+	/**
+	 * Ensures the subscriptions table includes plan_type column.
+	 *
+	 * @param string $table_name Subscriptions table name.
+	 *
+	 * @return void
+	 */
+	protected function maybe_add_plan_type_column( $table_name ) {
+		global $wpdb;
+
+		$column = $wpdb->get_var(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM {$table_name} LIKE %s",
+				'plan_type'
+			)
+		);
+
+		if ( ! empty( $column ) ) {
+			return;
+		}
+
+		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN plan_type varchar(50) NOT NULL DEFAULT 'individual' AFTER plan_id" );
 	}
 
 	/**
@@ -148,6 +238,11 @@ class Subscriptions_Module extends Abstract_Module {
 		global $wpdb;
 
 		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
+
+		if ( ! $this->subscriptions_table_exists( $table_name ) ) {
+			return;
+		}
+
 		$today      = current_time( 'Y-m-d' );
 
 		$subscriptions = $wpdb->get_results(
@@ -286,6 +381,11 @@ class Subscriptions_Module extends Abstract_Module {
 		global $wpdb;
 
 		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
+
+		if ( ! $this->subscriptions_table_exists( $table_name ) ) {
+			return;
+		}
+
 		$timestamp  = strtotime( $current_date . ' +7 days' );
 		$next_date  = $timestamp ? gmdate( 'Y-m-d', $timestamp ) : gmdate( 'Y-m-d', strtotime( '+7 days' ) );
 
@@ -403,6 +503,12 @@ class Subscriptions_Module extends Abstract_Module {
 		}
 
 		$table_name   = $wpdb->prefix . 'restaurant_subscriptions';
+
+		if ( ! $this->subscriptions_table_exists( $table_name ) ) {
+			echo '<p>' . esc_html__( 'Subscriptions are currently unavailable. Please try again shortly.', 'restaurant-food-services' ) . '</p>';
+			return;
+		}
+
 		$subscriptions = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT * FROM {$table_name} WHERE user_id = %d ORDER BY created_at DESC",
@@ -504,6 +610,10 @@ class Subscriptions_Module extends Abstract_Module {
 
 		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
 
+		if ( ! $this->subscriptions_table_exists( $table_name ) ) {
+			return;
+		}
+
 		$subscription = $wpdb->get_row(
 			$wpdb->prepare(
 				"SELECT * FROM {$table_name} WHERE id = %d AND user_id = %d",
@@ -597,6 +707,12 @@ class Subscriptions_Module extends Abstract_Module {
 		global $wpdb;
 
 		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
+
+		if ( ! $this->subscriptions_table_exists( $table_name ) ) {
+			echo '<div class="notice notice-warning"><p>' . esc_html__( 'Subscriptions table was missing and is being initialized. Reload this page in a moment.', 'restaurant-food-services' ) . '</p></div>';
+			$this->ensure_subscriptions_table();
+			return;
+		}
 
 		$status_filter = '';
 		$date_from     = '';
@@ -713,5 +829,61 @@ class Subscriptions_Module extends Abstract_Module {
 			</table>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Creates/updates subscriptions table at runtime when missing.
+	 *
+	 * @return void
+	 */
+	public function ensure_subscriptions_table() {
+		global $wpdb;
+
+		$table_name = $wpdb->prefix . 'restaurant_subscriptions';
+
+		if ( $this->subscriptions_table_exists( $table_name ) ) {
+			$this->maybe_add_plan_type_column( $table_name );
+			return;
+		}
+
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+
+		$charset_collate = $wpdb->get_charset_collate();
+		$sql             = "CREATE TABLE {$table_name} (
+			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			user_id bigint(20) unsigned NOT NULL,
+			plan_id bigint(20) unsigned NOT NULL,
+			plan_type varchar(50) NOT NULL DEFAULT 'individual',
+			meals_per_week int(11) unsigned NOT NULL DEFAULT 0,
+			selected_meals longtext NULL,
+			delivery_days longtext NULL,
+			status varchar(50) NOT NULL DEFAULT 'active',
+			next_order_date date DEFAULT NULL,
+			created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			PRIMARY KEY  (id),
+			KEY user_id (user_id),
+			KEY plan_id (plan_id),
+			KEY status (status),
+			KEY next_order_date (next_order_date)
+		) {$charset_collate};";
+
+		dbDelta( $sql );
+	}
+
+	/**
+	 * Checks whether the subscriptions table exists.
+	 *
+	 * @param string $table_name Table name.
+	 *
+	 * @return bool
+	 */
+	protected function subscriptions_table_exists( $table_name ) {
+		global $wpdb;
+
+		$found = $wpdb->get_var(
+			$wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name )
+		);
+
+		return is_string( $found ) && $found === $table_name;
 	}
 }

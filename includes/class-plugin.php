@@ -12,6 +12,7 @@ use Restaurant\FoodServices\Modules\Delivery_Module;
 use Restaurant\FoodServices\Modules\Emails_Module;
 use Restaurant\FoodServices\Modules\Meals_Module;
 use Restaurant\FoodServices\Modules\Module_Interface;
+use Restaurant\FoodServices\Modules\Public_Module;
 use Restaurant\FoodServices\Modules\Subscriptions_Module;
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -136,6 +137,7 @@ class Plugin {
 	 */
 	protected function load_modules() {
 		return array(
+			new Public_Module(),
 			new Emails_Module(),
 			new Meals_Module(),
 			new Subscriptions_Module(),

@@ -34,15 +34,15 @@ do_action( 'woocommerce_email_header', $email_heading, $email );
 	<tbody>
 		<tr>
 			<td style="border: 1px solid #ddd; padding: 10px;"><strong><?php esc_html_e( 'Event Location', 'restaurant-food-services' ); ?></strong></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $catering->location ?? '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $catering->location ) ? $catering->location : '' ); ?></td>
 		</tr>
 		<tr>
 			<td style="border: 1px solid #ddd; padding: 10px;"><strong><?php esc_html_e( 'Event Date', 'restaurant-food-services' ); ?></strong></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $catering->event_date ?? '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $catering->event_date ) ? $catering->event_date : '' ); ?></td>
 		</tr>
 		<tr>
 			<td style="border: 1px solid #ddd; padding: 10px;"><strong><?php esc_html_e( 'Number of Guests', 'restaurant-food-services' ); ?></strong></td>
-			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( $catering->guest_count ?? '' ); ?></td>
+			<td style="border: 1px solid #ddd; padding: 10px;"><?php echo esc_html( isset( $catering->guest_count ) ? $catering->guest_count : '' ); ?></td>
 		</tr>
 		<tr>
 			<td style="border: 1px solid #ddd; padding: 10px;"><strong><?php esc_html_e( 'Total Price', 'restaurant-food-services' ); ?></strong></td>
@@ -63,8 +63,8 @@ do_action( 'woocommerce_email_header', $email_heading, $email );
 		<?php foreach ( $catering->menu_items as $item ) : ?>
 			<li>
 				<?php
-				echo esc_html( $item['product_name'] ?? '' );
-				echo ' x ' . esc_html( $item['quantity'] ?? 1 );
+				echo esc_html( isset( $item['product_name'] ) ? $item['product_name'] : '' );
+				echo ' x ' . esc_html( isset( $item['quantity'] ) ? $item['quantity'] : 1 );
 				if ( isset( $item['price'] ) ) {
 					echo ' @ $' . esc_html( number_format( (float) $item['price'], 2 ) );
 				}

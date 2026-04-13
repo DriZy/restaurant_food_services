@@ -77,7 +77,8 @@ class Emails_Module extends Abstract_Module {
 			return;
 		}
 
-		$email = WC()->mailer()->get_emails()['restaurant_subscription_created'] ?? null;
+		$emails = WC()->mailer()->get_emails();
+		$email  = isset( $emails['restaurant_subscription_created'] ) ? $emails['restaurant_subscription_created'] : null;
 
 		if ( $email ) {
 			$email->trigger( $subscription_id, $subscription_data );
@@ -102,7 +103,8 @@ class Emails_Module extends Abstract_Module {
 			return;
 		}
 
-		$email = WC()->mailer()->get_emails()['restaurant_catering_request_submitted'] ?? null;
+		$emails = WC()->mailer()->get_emails();
+		$email  = isset( $emails['restaurant_catering_request_submitted'] ) ? $emails['restaurant_catering_request_submitted'] : null;
 
 		if ( $email ) {
 			$email->trigger( $catering_id, $catering_data );
@@ -127,7 +129,8 @@ class Emails_Module extends Abstract_Module {
 			return;
 		}
 
-		$email = WC()->mailer()->get_emails()['restaurant_catering_approved'] ?? null;
+		$emails = WC()->mailer()->get_emails();
+		$email  = isset( $emails['restaurant_catering_approved'] ) ? $emails['restaurant_catering_approved'] : null;
 
 		if ( $email ) {
 			$email->trigger( $catering_id, $catering_data );
@@ -158,15 +161,31 @@ class Emails_Module extends Abstract_Module {
 
 		$user = get_user_by( 'id', $subscription->user_id );
 		$product = wc_get_product( $subscription->plan_id );
+		$plan_type = isset( $subscription->plan_type ) ? sanitize_text_field( (string) $subscription->plan_type ) : '';
 
-		if ( ! $user || ! $product ) {
+		if ( ! $user ) {
 			return array();
+		}
+
+		$plan_name = '';
+
+		if ( $product ) {
+			$plan_name = $product->get_name();
+		} elseif ( '' !== $plan_type ) {
+			$plan_name = sprintf(
+				/* translators: %s: plan type label */
+				__( '%s Meal Plan', 'restaurant-food-services' ),
+				ucfirst( $plan_type )
+			);
+		} else {
+			$plan_name = __( 'Meal Plan Subscription', 'restaurant-food-services' );
 		}
 
 		return array(
 			'subscription_id'  => $subscription->id,
 			'plan_id'          => $subscription->plan_id,
-			'plan_name'        => $product->get_name(),
+			'plan_name'        => $plan_name,
+			'plan_type'        => $plan_type,
 			'meals_per_week'   => $subscription->meals_per_week,
 			'user_id'          => $subscription->user_id,
 			'user_email'       => $user->user_email,

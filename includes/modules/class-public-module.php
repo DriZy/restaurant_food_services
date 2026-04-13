@@ -419,20 +419,7 @@ class Public_Module extends Abstract_Module {
 	 * @return array<string,string>
 	 */
 	protected function get_catering_offering_options() {
-		return array(
-			'wedding_catering'        => __( 'Event Catering - Weddings', 'restaurant-food-services' ),
-			'birthday_catering'       => __( 'Event Catering - Birthdays', 'restaurant-food-services' ),
-			'funeral_catering'        => __( 'Event Catering - Funerals', 'restaurant-food-services' ),
-			'conference_catering'     => __( 'Event Catering - Conferences', 'restaurant-food-services' ),
-			'corporate_meeting'       => __( 'Corporate Catering - Meetings', 'restaurant-food-services' ),
-			'office_lunch'            => __( 'Corporate Catering - Office Lunches', 'restaurant-food-services' ),
-			'corporate_training'      => __( 'Corporate Catering - Trainings', 'restaurant-food-services' ),
-			'school_bulk_meals'       => __( 'Bulk Meal Production - Schools', 'restaurant-food-services' ),
-			'ngo_bulk_meals'          => __( 'Bulk Meal Production - NGOs', 'restaurant-food-services' ),
-			'hospital_bulk_meals'     => __( 'Bulk Meal Production - Hospitals', 'restaurant-food-services' ),
-			'outdoor_on_site_cooking' => __( 'Outdoor Catering / On-site Cooking', 'restaurant-food-services' ),
-			'custom_menu_design'      => __( 'Custom Menu Design', 'restaurant-food-services' ),
-		);
+		return $this->normalize_catering_options_map( get_option( 'restaurant_catering_offering_options', array() ) );
 	}
 
 	/**
@@ -441,12 +428,43 @@ class Public_Module extends Abstract_Module {
 	 * @return array<string,string>
 	 */
 	protected function get_catering_service_options() {
-		return array(
-			'buffet'                => __( 'Buffet Service', 'restaurant-food-services' ),
-			'plated'                => __( 'Plated Service', 'restaurant-food-services' ),
-			'packed_meals'          => __( 'Packed Meal Boxes', 'restaurant-food-services' ),
-			'live_cooking_stations' => __( 'Live Cooking Stations', 'restaurant-food-services' ),
-		);
+		return $this->normalize_catering_options_map( get_option( 'restaurant_catering_service_options', array() ) );
+	}
+
+	/**
+	 * Normalizes a saved catering options payload into value => label map.
+	 *
+	 * @param mixed $options Raw options payload.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function normalize_catering_options_map( $options ) {
+		if ( ! is_array( $options ) ) {
+			return array();
+		}
+
+		$normalized = array();
+
+		foreach ( $options as $value => $label ) {
+			if ( is_array( $label ) ) {
+				$candidate_value = isset( $label['value'] ) ? $label['value'] : ( isset( $label['key'] ) ? $label['key'] : '' );
+				$candidate_label = isset( $label['label'] ) ? $label['label'] : '';
+			} else {
+				$candidate_value = $value;
+				$candidate_label = $label;
+			}
+
+			$candidate_value = sanitize_title( (string) $candidate_value );
+			$candidate_label = sanitize_text_field( (string) $candidate_label );
+
+			if ( '' === $candidate_value || '' === $candidate_label ) {
+				continue;
+			}
+
+			$normalized[ $candidate_value ] = $candidate_label;
+		}
+
+		return $normalized;
 	}
 
 	/**

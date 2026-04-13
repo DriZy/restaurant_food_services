@@ -45,6 +45,47 @@ class Catering_Module extends Abstract_Module {
 		$loader->add_filter( 'woocommerce_account_menu_items', $this, 'add_catering_menu_item' );
 		$loader->add_action( 'woocommerce_account_my-catering-requests_endpoint', $this, 'render_my_catering_requests_page' );
 		$loader->add_action( 'admin_menu', $this, 'register_catering_admin_menu' );
+		$loader->add_action( 'admin_enqueue_scripts', $this, 'enqueue_catering_admin_assets' );
+		$loader->add_action( 'wp_ajax_restaurant_catering_settings_option_action', $this, 'ajax_catering_settings_option_action' );
+	}
+
+	/**
+	 * Enqueues admin-only assets for catering settings.
+	 *
+	 * @param string $hook_suffix Current admin page hook.
+	 *
+	 * @return void
+	 */
+	public function enqueue_catering_admin_assets( $hook_suffix ) {
+		$current_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+		if ( 'restaurant-catering-settings' !== $current_page && false === strpos( (string) $hook_suffix, 'restaurant-catering-settings' ) ) {
+			return;
+		}
+
+		$script_path    = dirname( dirname( __DIR__ ) ) . '/assets/js/catering-settings-admin.js';
+		$script_version = defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0';
+
+		if ( file_exists( $script_path ) ) {
+			$script_version = (string) filemtime( $script_path );
+		}
+
+		wp_enqueue_script(
+			'restaurant-food-services-catering-settings-admin',
+			RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-settings-admin.js',
+			array( 'jquery' ),
+			$script_version,
+			true
+		);
+
+		wp_localize_script(
+			'restaurant-food-services-catering-settings-admin',
+			'RestaurantFoodServicesCateringSettings',
+			array(
+				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+				'errorMessage'  => esc_html__( 'Request failed. Please refresh and try again.', 'restaurant-food-services' ),
+			)
+		);
 	}
 
 	/**
@@ -874,7 +915,474 @@ class Catering_Module extends Abstract_Module {
 			'restaurant-catering-requests',
 			array( $this, 'render_catering_requests_admin_page' )
 		);
+
+		add_submenu_page(
+			'restaurant-food-services',
+			esc_html__( 'Catering Settings', 'restaurant-food-services' ),
+			esc_html__( 'Catering Settings', 'restaurant-food-services' ),
+			'manage_options',
+			'restaurant-catering-settings',
+			array( $this, 'render_catering_settings_admin_page' )
+		);
 	}
+
+	/**
+	 * Renders catering settings admin page.
+	 *
+	 * @return void
+	 */
+	public function render_catering_settings_admin_page() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permission denied.', 'restaurant-food-services' ) );
+		}
+
+		if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
+			$this->handle_catering_settings_save();
+		}
+
+		$offering_options = $this->get_saved_catering_options( 'restaurant_catering_offering_options' );
+		$service_options  = $this->get_saved_catering_options( 'restaurant_catering_service_options' );
+		$offering_page = $this->get_catering_settings_page_number( 'offering_page' );
+		$service_page  = $this->get_catering_settings_page_number( 'service_page' );
+
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Catering Settings', 'restaurant-food-services' ); ?></h1>
+			<div class="restaurant-catering-settings-notices"></div>
+			<?php settings_errors( 'restaurant_catering_settings' ); ?>
+
+			<?php
+			$this->render_catering_settings_options_table(
+				'restaurant_catering_offering_options',
+				esc_html__( 'Catering Offerings', 'restaurant-food-services' ),
+				$offering_options,
+				'offering_page',
+				$offering_page,
+				$service_page
+			);
+
+			$this->render_catering_settings_options_table(
+				'restaurant_catering_service_options',
+				esc_html__( 'Service Options', 'restaurant-food-services' ),
+				$service_options,
+				'service_page',
+				$offering_page,
+				$service_page
+			);
+
+			echo '<style>
+			.restaurant-catering-settings-modal[hidden]{display:none;}
+			.restaurant-catering-settings-modal.is-open{display:block;position:fixed;inset:0;z-index:100000;}
+			.restaurant-catering-settings-modal__backdrop{position:absolute;inset:0;background:rgba(0,0,0,.45);}
+			.restaurant-catering-settings-modal__dialog{position:relative;z-index:1;max-width:520px;margin:8vh auto;background:#fff;border-radius:8px;padding:24px;box-shadow:0 10px 35px rgba(0,0,0,.2);}
+			.restaurant-catering-settings-modal__actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+			.restaurant-catering-settings-notices{margin:16px 0;}
+			</style>';
+
+			echo '<div class="restaurant-catering-settings-modal" hidden>';
+			echo '<div class="restaurant-catering-settings-modal__backdrop" data-catering-modal-close></div>';
+			echo '<div class="restaurant-catering-settings-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="restaurant-catering-settings-modal-title">';
+			echo '<h2 id="restaurant-catering-settings-modal-title">' . esc_html__( 'Rename Option', 'restaurant-food-services' ) . '</h2>';
+			echo '<form class="restaurant-catering-settings-modal__form">';
+			wp_nonce_field( 'restaurant_catering_settings_save', 'restaurant_catering_settings_nonce' );
+			echo '<input type="hidden" name="catering_settings_action" value="rename">';
+			echo '<input type="hidden" name="option_name" value="">';
+			echo '<input type="hidden" name="option_key" value="">';
+			echo '<input type="hidden" name="offering_page" value="' . esc_attr( (string) $offering_page ) . '">';
+			echo '<input type="hidden" name="service_page" value="' . esc_attr( (string) $service_page ) . '">';
+			echo '<p><label for="restaurant-catering-settings-modal-input">' . esc_html__( 'New label', 'restaurant-food-services' ) . '</label></p>';
+			echo '<input id="restaurant-catering-settings-modal-input" type="text" name="rename_label" class="regular-text" required>';
+			echo '<div class="restaurant-catering-settings-modal__actions">';
+			echo '<button type="button" class="button" data-catering-modal-close>' . esc_html__( 'Cancel', 'restaurant-food-services' ) . '</button>';
+			echo '<button type="submit" class="button button-primary">' . esc_html__( 'Update', 'restaurant-food-services' ) . '</button>';
+			echo '</div>';
+			echo '</form>';
+			echo '</div>';
+			echo '</div>';
+			?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Saves catering settings from the admin form.
+	 *
+	 * @return void
+	 */
+	protected function handle_catering_settings_save() {
+		$action = isset( $_POST['catering_settings_action'] ) ? sanitize_key( wp_unslash( $_POST['catering_settings_action'] ) ) : '';
+
+		if ( '' === $action ) {
+			return;
+		}
+
+		if ( ! isset( $_POST['restaurant_catering_settings_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['restaurant_catering_settings_nonce'] ) ), 'restaurant_catering_settings_save' ) ) {
+			add_settings_error( 'restaurant_catering_settings', 'restaurant_catering_settings_nonce_error', esc_html__( 'Security check failed. Please try again.', 'restaurant-food-services' ), 'error' );
+			return;
+		}
+
+		$option_name = isset( $_POST['option_name'] ) ? sanitize_key( wp_unslash( $_POST['option_name'] ) ) : '';
+
+		$result = $this->process_catering_settings_action( $action, $option_name );
+
+		add_settings_error(
+			'restaurant_catering_settings',
+			$result['code'],
+			$result['message'],
+			$result['success'] ? 'updated' : 'error'
+		);
+	}
+
+	/**
+	 * AJAX handler for add/rename/delete settings actions.
+	 *
+	 * @return void
+	 */
+	public function ajax_catering_settings_option_action() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Permission denied.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		if ( ! check_ajax_referer( 'restaurant_catering_settings_save', 'restaurant_catering_settings_nonce', false ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed. Please refresh and try again.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		$action      = isset( $_POST['catering_settings_action'] ) ? sanitize_key( wp_unslash( $_POST['catering_settings_action'] ) ) : '';
+		$option_name = isset( $_POST['option_name'] ) ? sanitize_key( wp_unslash( $_POST['option_name'] ) ) : '';
+
+		$result = $this->process_catering_settings_action( $action, $option_name );
+
+		if ( empty( $result['option_name'] ) ) {
+			wp_send_json_error( array( 'message' => $result['message'] ), 400 );
+		}
+
+		$offering_options = $this->get_saved_catering_options( 'restaurant_catering_offering_options' );
+		$service_options  = $this->get_saved_catering_options( 'restaurant_catering_service_options' );
+		$offering_page    = $this->get_catering_settings_page_number( 'offering_page' );
+		$service_page     = $this->get_catering_settings_page_number( 'service_page' );
+
+		ob_start();
+
+		if ( 'restaurant_catering_offering_options' === $result['option_name'] ) {
+			$this->render_catering_settings_options_table(
+				'restaurant_catering_offering_options',
+				esc_html__( 'Catering Offerings', 'restaurant-food-services' ),
+				$offering_options,
+				'offering_page',
+				$offering_page,
+				$service_page
+			);
+		} else {
+			$this->render_catering_settings_options_table(
+				'restaurant_catering_service_options',
+				esc_html__( 'Service Options', 'restaurant-food-services' ),
+				$service_options,
+				'service_page',
+				$offering_page,
+				$service_page
+			);
+		}
+
+		$section_html = ob_get_clean();
+
+		if ( $result['success'] ) {
+			wp_send_json_success(
+				array(
+					'message'     => $result['message'],
+					'optionName'  => $result['option_name'],
+					'sectionHtml' => $section_html,
+				)
+			);
+		}
+
+		wp_send_json_error(
+			array(
+				'message'     => $result['message'],
+				'optionName'  => $result['option_name'],
+				'sectionHtml' => $section_html,
+			),
+			400
+		);
+	}
+
+	/**
+	 * Applies one add/rename/delete settings action.
+	 *
+	 * @param string $action Action key.
+	 * @param string $option_name Option name.
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function process_catering_settings_action( $action, $option_name ) {
+		if ( ! in_array( $option_name, array( 'restaurant_catering_offering_options', 'restaurant_catering_service_options' ), true ) ) {
+			return array(
+				'success'     => false,
+				'code'        => 'restaurant_catering_settings_invalid_option',
+				'message'     => esc_html__( 'Invalid settings group.', 'restaurant-food-services' ),
+				'option_name' => '',
+			);
+		}
+
+		$options = $this->get_saved_catering_options( $option_name );
+
+		switch ( $action ) {
+			case 'add':
+				$new_label = isset( $_POST['new_label'] ) ? sanitize_text_field( wp_unslash( $_POST['new_label'] ) ) : '';
+
+				if ( '' === $new_label ) {
+					return array(
+						'success'     => false,
+						'code'        => 'restaurant_catering_settings_add_empty',
+						'message'     => esc_html__( 'Enter a label before adding an option.', 'restaurant-food-services' ),
+						'option_name' => $option_name,
+					);
+				}
+
+				$new_key = $this->generate_catering_option_key( $new_label, $options );
+				$options[ $new_key ] = $new_label;
+				update_option( $option_name, $options );
+
+				return array(
+					'success'     => true,
+					'code'        => 'restaurant_catering_settings_added',
+					'message'     => esc_html__( 'Option added.', 'restaurant-food-services' ),
+					'option_name' => $option_name,
+				);
+
+			case 'rename':
+				$option_key = isset( $_POST['option_key'] ) ? sanitize_title( wp_unslash( $_POST['option_key'] ) ) : '';
+				$new_label  = isset( $_POST['rename_label'] ) ? sanitize_text_field( wp_unslash( $_POST['rename_label'] ) ) : '';
+
+				if ( '' === $option_key || ! isset( $options[ $option_key ] ) ) {
+					return array(
+						'success'     => false,
+						'code'        => 'restaurant_catering_settings_rename_invalid',
+						'message'     => esc_html__( 'Option not found for rename.', 'restaurant-food-services' ),
+						'option_name' => $option_name,
+					);
+				}
+
+				if ( '' === $new_label ) {
+					return array(
+						'success'     => false,
+						'code'        => 'restaurant_catering_settings_rename_empty',
+						'message'     => esc_html__( 'Enter a new label before renaming.', 'restaurant-food-services' ),
+						'option_name' => $option_name,
+					);
+				}
+
+				$options[ $option_key ] = $new_label;
+				update_option( $option_name, $options );
+
+				return array(
+					'success'     => true,
+					'code'        => 'restaurant_catering_settings_renamed',
+					'message'     => esc_html__( 'Option renamed.', 'restaurant-food-services' ),
+					'option_name' => $option_name,
+				);
+
+			case 'delete':
+				$option_key = isset( $_POST['option_key'] ) ? sanitize_title( wp_unslash( $_POST['option_key'] ) ) : '';
+
+				if ( '' === $option_key || ! isset( $options[ $option_key ] ) ) {
+					return array(
+						'success'     => false,
+						'code'        => 'restaurant_catering_settings_delete_invalid',
+						'message'     => esc_html__( 'Option not found for deletion.', 'restaurant-food-services' ),
+						'option_name' => $option_name,
+					);
+				}
+
+				unset( $options[ $option_key ] );
+				update_option( $option_name, $options );
+
+				return array(
+					'success'     => true,
+					'code'        => 'restaurant_catering_settings_deleted',
+					'message'     => esc_html__( 'Option deleted.', 'restaurant-food-services' ),
+					'option_name' => $option_name,
+				);
+		}
+
+		return array(
+			'success'     => false,
+			'code'        => 'restaurant_catering_settings_unknown_action',
+			'message'     => esc_html__( 'Unknown settings action.', 'restaurant-food-services' ),
+			'option_name' => $option_name,
+		);
+	}
+
+	/**
+	 * Gets saved catering options.
+	 *
+	 * @param string $option_name Option key.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function get_saved_catering_options( $option_name ) {
+		$saved = get_option( $option_name, array() );
+
+		if ( ! is_array( $saved ) || empty( $saved ) ) {
+			return array();
+		}
+
+		$normalized = array();
+
+		foreach ( $saved as $value => $label ) {
+			$value = sanitize_title( (string) $value );
+			$label = sanitize_text_field( (string) $label );
+
+			if ( '' === $value || '' === $label ) {
+				continue;
+			}
+
+			$normalized[ $value ] = $label;
+		}
+
+		return $normalized;
+	}
+
+	/**
+	 * Renders one settings section with add/rename/delete table controls.
+	 *
+	 * @param string              $option_name Option key.
+	 * @param string              $section_title Section heading.
+	 * @param array<string,string> $options Option map.
+	 * @param string              $current_page_param Current section page query key.
+	 * @param int                 $offering_page Current offerings page.
+	 * @param int                 $service_page Current services page.
+	 *
+	 * @return void
+	 */
+	protected function render_catering_settings_options_table( $option_name, $section_title, $options, $current_page_param, $offering_page, $service_page ) {
+		echo '<section class="restaurant-catering-settings-section" data-option-name="' . esc_attr( $option_name ) . '">';
+
+		$per_page = 8;
+		$page     = 'offering_page' === $current_page_param ? $offering_page : $service_page;
+		$total    = count( $options );
+		$pages    = max( 1, (int) ceil( $total / $per_page ) );
+		$page     = min( max( 1, $page ), $pages );
+		$offset   = ( $page - 1 ) * $per_page;
+		$rows     = array_slice( $options, $offset, $per_page, true );
+
+		echo '<h2 style="margin-top:28px;">' . esc_html( $section_title ) . '</h2>';
+		echo '<form method="post" style="margin: 12px 0 16px; display:flex; gap:8px; align-items:center;">';
+		wp_nonce_field( 'restaurant_catering_settings_save', 'restaurant_catering_settings_nonce' );
+		echo '<input type="hidden" name="catering_settings_action" value="add">';
+		echo '<input type="hidden" name="option_name" value="' . esc_attr( $option_name ) . '">';
+		echo '<input type="hidden" name="offering_page" value="' . esc_attr( (string) $offering_page ) . '">';
+		echo '<input type="hidden" name="service_page" value="' . esc_attr( (string) $service_page ) . '">';
+		echo '<input type="text" name="new_label" class="regular-text" placeholder="' . esc_attr__( 'Enter new option label', 'restaurant-food-services' ) . '" required>';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Add Option', 'restaurant-food-services' ) . '</button>';
+		echo '</form>';
+
+		echo '<table class="widefat striped">';
+		echo '<thead><tr>';
+		echo '<th style="width:32%;">' . esc_html__( 'Key', 'restaurant-food-services' ) . '</th>';
+		echo '<th>' . esc_html__( 'Label', 'restaurant-food-services' ) . '</th>';
+		echo '<th style="width:280px;">' . esc_html__( 'Actions', 'restaurant-food-services' ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		if ( empty( $rows ) ) {
+			echo '<tr><td colspan="3">' . esc_html__( 'No options added yet.', 'restaurant-food-services' ) . '</td></tr>';
+		} else {
+			foreach ( $rows as $key => $label ) {
+				echo '<tr>';
+				echo '<td><code>' . esc_html( $key ) . '</code></td>';
+				echo '<td>' . esc_html( $label ) . '</td>';
+				echo '<td>';
+
+				echo '<form method="post" class="restaurant-catering-settings-rename-form" style="display:inline-flex; gap:6px; margin-right:8px;">';
+				wp_nonce_field( 'restaurant_catering_settings_save', 'restaurant_catering_settings_nonce' );
+				echo '<input type="hidden" name="catering_settings_action" value="rename">';
+				echo '<input type="hidden" name="option_name" value="' . esc_attr( $option_name ) . '">';
+				echo '<input type="hidden" name="option_key" value="' . esc_attr( $key ) . '">';
+				echo '<input type="hidden" name="offering_page" value="' . esc_attr( (string) $offering_page ) . '">';
+				echo '<input type="hidden" name="service_page" value="' . esc_attr( (string) $service_page ) . '">';
+				echo '<input type="hidden" name="rename_label" value="' . esc_attr( $label ) . '">';
+				echo '<button type="button" class="button restaurant-catering-settings-rename-button" data-option-key="' . esc_attr( $key ) . '" data-option-label="' . esc_attr( $label ) . '" data-option-name="' . esc_attr( $option_name ) . '">' . esc_html__( 'Rename', 'restaurant-food-services' ) . '</button>';
+				echo '</form>';
+
+				echo '<form method="post" class="restaurant-catering-settings-delete-form" style="display:inline-block;">';
+				wp_nonce_field( 'restaurant_catering_settings_save', 'restaurant_catering_settings_nonce' );
+				echo '<input type="hidden" name="catering_settings_action" value="delete">';
+				echo '<input type="hidden" name="option_name" value="' . esc_attr( $option_name ) . '">';
+				echo '<input type="hidden" name="option_key" value="' . esc_attr( $key ) . '">';
+				echo '<input type="hidden" name="offering_page" value="' . esc_attr( (string) $offering_page ) . '">';
+				echo '<input type="hidden" name="service_page" value="' . esc_attr( (string) $service_page ) . '">';
+				echo '<button type="submit" class="button restaurant-catering-settings-delete-button" onclick="return confirm(\'' . esc_js( __( 'Delete this option?', 'restaurant-food-services' ) ) . '\');">' . esc_html__( 'Delete', 'restaurant-food-services' ) . '</button>';
+				echo '</form>';
+
+				echo '</td>';
+				echo '</tr>';
+			}
+		}
+
+		echo '</tbody></table>';
+
+		if ( $pages > 1 ) {
+			echo '<p style="margin-top:10px;">';
+			for ( $i = 1; $i <= $pages; $i++ ) {
+				$url = add_query_arg(
+					array(
+						'page'          => 'restaurant-catering-settings',
+						'offering_page' => 'offering_page' === $current_page_param ? $i : $offering_page,
+						'service_page'  => 'service_page' === $current_page_param ? $i : $service_page,
+					),
+					admin_url( 'admin.php' )
+				);
+
+				if ( $i === $page ) {
+					echo '<span class="button button-primary" style="margin-right:6px;">' . esc_html( (string) $i ) . '</span>';
+				} else {
+					echo '<a class="button" style="margin-right:6px;" href="' . esc_url( $url ) . '">' . esc_html( (string) $i ) . '</a>';
+				}
+			}
+			echo '</p>';
+		}
+
+		echo '</section>';
+	}
+
+	/**
+	 * Returns a validated settings page number.
+	 *
+	 * @param string $param_name Query parameter name.
+	 *
+	 * @return int
+	 */
+	protected function get_catering_settings_page_number( $param_name ) {
+		$value = isset( $_REQUEST[ $param_name ] ) ? absint( wp_unslash( $_REQUEST[ $param_name ] ) ) : 1;
+
+		return $value > 0 ? $value : 1;
+	}
+
+	/**
+	 * Generates a unique option key from label.
+	 *
+	 * @param string              $label Source label.
+	 * @param array<string,string> $existing Existing options map.
+	 *
+	 * @return string
+	 */
+	protected function generate_catering_option_key( $label, $existing ) {
+		$base = sanitize_title( $label );
+
+		if ( '' === $base ) {
+			$base = 'option';
+		}
+
+		$key     = $base;
+		$suffix  = 2;
+
+		while ( isset( $existing[ $key ] ) ) {
+			$key = $base . '_' . $suffix;
+			++$suffix;
+		}
+
+		return $key;
+	}
+
 
 	/**
 	 * Renders the catering requests admin page.

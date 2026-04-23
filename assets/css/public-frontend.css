@@ -98,12 +98,12 @@
 .restaurant-catering-wizard .restaurant-catering-meal-row .restaurant-meal-card__image,
 .restaurant-meal-plans-wizard .restaurant-meal-row .restaurant-meal-card__image-link,
 .restaurant-meal-plans-wizard .restaurant-meal-row .restaurant-meal-card__image {
-	width: 64px;
-	height: 64px;
-	min-width: 64px;
-	min-height: 64px;
-	max-width: 64px;
-	max-height: 64px;
+	width: 85px;
+	height: 85px;
+	min-width: 65px;
+	min-height: 65px;
+	max-width: 85px;
+	max-height: 85px;
 	border-radius: 0.35rem;
 	overflow: hidden;
 	object-fit: cover;

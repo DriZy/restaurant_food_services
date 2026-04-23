@@ -22,9 +22,23 @@ esc_html_e( 'We have received your request and will review it shortly. Here are 
 echo "\n\n";
 
 echo "Event Location: " . ( isset( $catering->location ) ? esc_html( $catering->location ) : '' ) . "\n";
+echo "Event Type: " . ( isset( $catering->event_type ) ? esc_html( $catering->event_type ) : '' ) . "\n";
 echo "Event Date: " . ( isset( $catering->event_date ) ? esc_html( $catering->event_date ) : '' ) . "\n";
 echo "Number of Guests: " . ( isset( $catering->guest_count ) ? esc_html( $catering->guest_count ) : '' ) . "\n";
+echo "Service Style: " . ( isset( $catering->serving_style ) ? esc_html( $catering->serving_style ) : '' ) . "\n";
 echo "Estimated Total: $" . ( isset( $catering->total_price ) ? esc_html( number_format( (float) $catering->total_price, 2 ) ) : '0.00' ) . "\n\n";
+
+if ( ! empty( $catering->special_requests ) ) {
+	echo "Special Requests:\n" . esc_html( $catering->special_requests ) . "\n\n";
+}
+
+if ( ! empty( $catering->dietary_requirements ) ) {
+	echo "Dietary Requirements:\n" . esc_html( $catering->dietary_requirements ) . "\n\n";
+}
+
+if ( ! empty( $catering->custom_description ) ) {
+	echo "Custom Meal Description:\n" . esc_html( $catering->custom_description ) . "\n\n";
+}
 
 if ( ! empty( $catering->menu_items ) ) {
 	echo "Menu Items:\n";

@@ -92,12 +92,15 @@
 			self.state.mealsPerWeek = parseInt($(this).val(), 10) || 0;
 		});
 
-		this.$root.on('change', '.restaurant-meal-select', function () {
-			var selected = [];
-			self.$root.find('.restaurant-meal-select:checked').each(function () {
-				selected.push(parseInt($(this).val(), 10));
-			});
-			self.state.selectedMeals = selected.filter(function (id) { return id > 0; });
+		this.$root.on('change input', '.restaurant-meal-plan-quantity', function () {
+			var qty = parseInt($(this).val(), 10);
+
+			if (!Number.isNaN(qty) && qty < 0) {
+				qty = 0;
+			}
+
+			$(this).val(Number.isNaN(qty) ? 0 : qty);
+			self.state.selectedMeals = self.collectSelectedMeals();
 			self.updateSidebar();
 		});
 
@@ -191,8 +194,12 @@
 		}
 
 		if (step === 3 && this.state.selectedMeals.length === 0) {
-			setInlineError(this.$root.find('.restaurant-meals-grid').first(), 'Please choose at least one meal.');
-			notify('Please choose at least one meal.', 'error');
+			this.state.selectedMeals = this.collectSelectedMeals();
+		}
+
+		if (step === 3 && this.state.selectedMeals.length === 0) {
+			setInlineError(this.$root.find('.restaurant-meals-grid').first(), 'Please enter quantity for at least one meal.');
+			notify('Please enter quantity for at least one meal.', 'error');
 			return false;
 		}
 
@@ -281,15 +288,20 @@
 			return;
 		}
 
+		this.state.selectedMeals = this.collectSelectedMeals();
+
 		var total = 0;
 		var items = [];
 
-		this.$root.find('.restaurant-meal-select:checked').each(function () {
-			var $input = $(this);
-			var name = ($input.data('product-name') || 'Meal').toString();
-			var price = parseFloat($input.data('product-price') || 0);
-			total += price;
-			items.push({ name: name, quantity: 1 });
+		this.state.selectedMeals.forEach(function (meal) {
+			var qty = parseInt(meal.quantity, 10) || 0;
+			var price = parseFloat(meal.price || 0);
+			if (qty <= 0) {
+				return;
+			}
+
+			total += (price * qty);
+			items.push({ name: meal.name, quantity: qty });
 		});
 
 		this.summarySidebar.update({
@@ -321,22 +333,26 @@
 	};
 
 	MealPlansWizard.prototype.renderSummary = function () {
-		var selectedMeals = [];
+		var selectedMeals = this.collectSelectedMeals();
+		var selectedMealsTotal = 0;
 
-		this.$root.find('.restaurant-meal-select:checked').each(function () {
-			var $input = $(this);
-			selectedMeals.push({
-				name: ($input.data('product-name') || 'Meal').toString(),
-				price: parseFloat($input.data('product-price') || 0)
-			});
+		selectedMeals.forEach(function (meal) {
+			var qty = parseInt(meal.quantity, 10) || 0;
+			var price = parseFloat(meal.price || 0);
+			if (qty > 0) {
+				selectedMealsTotal += qty;
+			}
 		});
 
 		var mealCardsHtml = '<p>-</p>';
 		if (selectedMeals.length) {
 			mealCardsHtml = '<div class="restaurant-selected-meals-cards">' + selectedMeals.map(function (meal) {
+				var qty = parseInt(meal.quantity, 10) || 0;
+				var lineTotal = (parseFloat(meal.price || 0) * qty);
 				return '<article class="restaurant-selected-meal-card">' +
 					'<h4 class="restaurant-selected-meal-card__title">' + escapeHtml(meal.name) + '</h4>' +
-					'<p class="restaurant-selected-meal-card__price">' + formatPrice(meal.price) + '</p>' +
+					'<p class="restaurant-selected-meal-card__price">' + formatPrice(meal.price) + ' x ' + escapeHtml(qty.toString()) + '</p>' +
+					'<p class="restaurant-selected-meal-card__price">' + formatPrice(lineTotal) + '</p>' +
 				'</article>';
 			}).join('') + '</div>';
 		}
@@ -350,11 +366,34 @@
 		html += '<article class="restaurant-summary-item"><strong>Delivery Location</strong><span>' + escapeHtml(this.state.deliveryLocation.formattedAddress || '-') + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Delivery Days</strong><span>' + escapeHtml(this.state.deliveryDays.join(', ') || '-') + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Delivery Time</strong><span>' + escapeHtml(this.state.deliveryTime || '-') + '</span></article>';
-		html += '<article class="restaurant-summary-item"><strong>Meals Selected</strong><span>' + escapeHtml(selectedMeals.length.toString()) + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Meals Selected</strong><span>' + escapeHtml(selectedMeals.length.toString()) + ' (' + escapeHtml(selectedMealsTotal.toString()) + ' qty)</span></article>';
 		html += '</div>';
 		html += '<div class="restaurant-selected-meals-summary"><h5>Selected Meals</h5>' + mealCardsHtml + '</div>';
 		html += '</section>';
 		this.$summary.html(html);
+	};
+
+	MealPlansWizard.prototype.collectSelectedMeals = function () {
+		var selectedMeals = [];
+
+		this.$root.find('.restaurant-meal-plan-quantity').each(function () {
+			var $input = $(this);
+			var productId = parseInt($input.data('product-id'), 10) || 0;
+			var quantity = parseInt($input.val(), 10) || 0;
+
+			if (productId <= 0 || quantity <= 0) {
+				return;
+			}
+
+			selectedMeals.push({
+				product_id: productId,
+				quantity: quantity,
+				name: ($input.data('product-name') || 'Meal').toString(),
+				price: parseFloat($input.data('product-price') || 0)
+			});
+		});
+
+		return selectedMeals;
 	};
 
 	MealPlansWizard.prototype.submit = function () {
@@ -389,6 +428,8 @@
 			notify('Unable to submit meal plan right now.', 'error');
 			return;
 		}
+
+		this.state.selectedMeals = this.collectSelectedMeals();
 
 		this.$submit.prop('disabled', true).addClass('loading');
 

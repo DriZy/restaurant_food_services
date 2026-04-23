@@ -46,6 +46,7 @@
 			location: '',
 			servingStyle: '',
 			menuQuantities: {},
+			customDescription: '',
 			specialRequests: '',
 			dietaryNeeds: '',
 			pricing: {
@@ -67,6 +68,8 @@
 		this.$pricePreview = this.$root.find('.restaurant-catering-price-preview');
 		this.$saveDraft = this.$root.find('.restaurant-catering-save-draft');
 		this.$submit = this.$root.find('.restaurant-catering-submit');
+		this.$submissionStatus = this.$root.find('.restaurant-wizard-submission-status');
+		this.$submissionMessage = this.$root.find('.restaurant-wizard-submission-message');
 		this.$sidebar = this.$root.find('[data-summary-sidebar="catering"]');
 		this.summarySidebar = null;
 		this.priceRequestTimer = null;
@@ -82,6 +85,7 @@
 
 		this.bindEvents();
 		this.syncUI();
+		this.toggleCustomOfferingSection();
 		this.updatePricePreview();
 		this.updateSidebar();
 	};
@@ -91,6 +95,7 @@
 
 		this.$root.on('change input', '[name="event_type"]', function () {
 			self.state.eventType = ($(this).val() || '').toString();
+			self.toggleCustomOfferingSection();
 		});
 
 		this.$root.on('change', 'input[name="event_date"]', function () {
@@ -130,6 +135,10 @@
 
 		this.$root.on('change input', 'textarea[name="dietary_needs"]', function () {
 			self.state.dietaryNeeds = ($(this).val() || '').toString();
+		});
+
+		this.$root.on('change input', 'textarea[name="custom_description"]', function () {
+			self.state.customDescription = ($(this).val() || '').toString();
 		});
 
 		this.$next.on('click', function () {
@@ -259,25 +268,37 @@
 		}
 
 		if (step === 2) {
-			var hasInvalidQuantity = false;
-			this.$root.find('.restaurant-menu-quantity').each(function () {
-				var raw = parseInt($(this).val(), 10);
-				if (!Number.isNaN(raw) && raw < 0) {
-					hasInvalidQuantity = true;
-					$(this).val(0);
-					setInlineError($(this), 'Quantity cannot be negative.');
+			var isCustomOffering = this.isCustomOffering();
+
+			if (isCustomOffering) {
+				// For custom offerings, require custom description
+				if (!this.state.customDescription || this.state.customDescription.trim() === '') {
+					setInlineError(this.$root.find('textarea[name="custom_description"]'), 'Please describe what you want.');
+					notify('Please describe your custom catering needs.', 'error');
+					return false;
 				}
-			});
+			} else {
+				// For standard offerings, require menu items
+				var hasInvalidQuantity = false;
+				this.$root.find('.restaurant-menu-quantity').each(function () {
+					var raw = parseInt($(this).val(), 10);
+					if (!Number.isNaN(raw) && raw < 0) {
+						hasInvalidQuantity = true;
+						$(this).val(0);
+						setInlineError($(this), 'Quantity cannot be negative.');
+					}
+				});
 
-			if (hasInvalidQuantity) {
-				notify('Please correct invalid quantities.', 'error');
-				return false;
-			}
+				if (hasInvalidQuantity) {
+					notify('Please correct invalid quantities.', 'error');
+					return false;
+				}
 
-			if (Object.keys(this.state.menuQuantities).length === 0) {
-				setInlineError(this.$root.find('.restaurant-catering-menu-list, .restaurant-meals-grid').first(), 'Please select at least one menu item quantity.');
-				notify('Please select at least one menu item quantity.', 'error');
-				return false;
+				if (Object.keys(this.state.menuQuantities).length === 0) {
+					setInlineError(this.$root.find('.restaurant-catering-menu-list, .restaurant-meals-grid').first(), 'Please select at least one menu item quantity.');
+					notify('Please select at least one menu item quantity.', 'error');
+					return false;
+				}
 			}
 		}
 
@@ -359,6 +380,54 @@
 		this.$summary.html(html);
 	};
 
+	CateringWizard.prototype.isCustomOffering = function () {
+		var eventType = (this.state.eventType || '').toString().toLowerCase();
+		return eventType.indexOf('custom') !== -1;
+	};
+
+	CateringWizard.prototype.toggleCustomOfferingSection = function () {
+		var isCustom = this.isCustomOffering();
+		var $listSection = this.$root.find('[data-menu-section="list"]');
+		var $customSection = this.$root.find('[data-menu-section="custom"]');
+
+		if (isCustom) {
+			$listSection.hide();
+			$customSection.show();
+		} else {
+			$listSection.show();
+			$customSection.hide();
+		}
+	};
+
+	CateringWizard.prototype.showSubmissionStatus = function (message, type, autoDismiss) {
+		var self = this;
+		var $status = this.$submissionStatus;
+		var $messageSpan = this.$submissionMessage;
+
+		if (!$status.length) {
+			return;
+		}
+
+		// Remove any existing auto-dismiss timeout
+		if (this.statusDismissTimer) {
+			clearTimeout(this.statusDismissTimer);
+		}
+
+		// Update message and type
+		$messageSpan.text(message);
+		$status
+			.removeClass('is-success is-error')
+			.addClass('is-' + type)
+			.show();
+
+		// Auto-dismiss after specified time (in ms)
+		if (autoDismiss && type !== 'loading') {
+			this.statusDismissTimer = setTimeout(function () {
+				$status.fadeOut(300);
+			}, autoDismiss);
+		}
+	};
+
 	CateringWizard.prototype.getAjaxConfig = function () {
 		return window.RestaurantFoodServicesPublic || {};
 	};
@@ -373,6 +442,7 @@
 		}
 
 		this.$saveDraft.prop('disabled', true).addClass('loading');
+		this.showSubmissionStatus('Saving your draft...', 'loading');
 
 		$.ajax({
 			url: cfg.ajaxUrl,
@@ -387,6 +457,7 @@
 				location: this.state.location,
 				serving_style: this.state.servingStyle,
 				menu_quantities: this.state.menuQuantities,
+				custom_description: this.state.customDescription,
 				special_requests: this.state.specialRequests,
 				dietary_requirements: this.state.dietaryNeeds,
 				dietary_needs: this.state.dietaryNeeds
@@ -394,13 +465,19 @@
 		})
 			.done(function (response) {
 				if (response && response.success) {
-					notify((response.data && response.data.message) ? response.data.message : 'Draft saved.', 'success');
+					var message = (response.data && response.data.message) ? response.data.message : 'Draft saved successfully.';
+					self.showSubmissionStatus(message, 'success', 3000);
+					notify(message, 'success');
 					return;
 				}
-				notify((response && response.data && response.data.message) ? response.data.message : 'Failed to save draft.', 'error');
+				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to save draft.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.fail(function () {
-				notify('Unable to save draft right now.', 'error');
+				var errorMsg = 'Unable to save draft right now. Please check your connection.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.always(function () {
 				self.$saveDraft.prop('disabled', false).removeClass('loading');
@@ -429,7 +506,7 @@
 			return;
 		}
 
-		if (!this.state.eventType && !this.state.eventDate && this.state.guestCount <= 0 && !this.state.location && Object.keys(this.state.menuQuantities).length === 0 && !this.state.specialRequests && !this.state.dietaryNeeds) {
+		if (!this.state.eventType && !this.state.eventDate && this.state.guestCount <= 0 && !this.state.location && Object.keys(this.state.menuQuantities).length === 0 && !this.state.specialRequests && !this.state.dietaryNeeds && !this.state.customDescription) {
 			notify('Cannot submit an empty catering request.', 'error');
 			return;
 		}
@@ -440,6 +517,7 @@
 		}
 
 		this.$submit.prop('disabled', true).addClass('loading');
+		this.showSubmissionStatus('Submitting your catering request...', 'loading');
 
 		$.ajax({
 			url: cfg.ajaxUrl,
@@ -454,6 +532,7 @@
 				location: this.state.location,
 				serving_style: this.state.servingStyle,
 				menu_quantities: this.state.menuQuantities,
+				custom_description: this.state.customDescription,
 				special_requests: this.state.specialRequests,
 				dietary_requirements: this.state.dietaryNeeds,
 				dietary_needs: this.state.dietaryNeeds
@@ -461,16 +540,22 @@
 		})
 			.done(function (response) {
 				if (response && response.success) {
-					notify((response.data && response.data.message) ? response.data.message : 'Catering request submitted.', 'success');
+					var message = (response.data && response.data.message) ? response.data.message : 'Catering request submitted successfully.';
+					self.showSubmissionStatus(message, 'success');
+					notify(message, 'success');
 					if (response.data && response.data.request_id) {
 						self.$root.attr('data-request-id', response.data.request_id);
 					}
 					return;
 				}
-				notify((response && response.data && response.data.message) ? response.data.message : 'Failed to submit request.', 'error');
+				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to submit request.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.fail(function () {
-				notify('Unable to submit request right now.', 'error');
+				var errorMsg = 'Unable to submit request right now. Please check your connection.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.always(function () {
 				self.$submit.prop('disabled', false).removeClass('loading');

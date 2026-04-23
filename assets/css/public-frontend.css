@@ -21,17 +21,43 @@
 	gap: 0.5rem;
 }
 
+.restaurant-catering-wizard .restaurant-catering-menu-list .restaurant-meal-card,
+.restaurant-meal-plans-wizard .restaurant-meal-plan-meals-list .restaurant-meal-card {
+	background: #fff !important;
+	border: 1px solid rgba(0, 0, 0, 0.06) !important;
+	border-radius: 0.5rem !important;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important;
+	padding: 0.75rem !important;
+	transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.restaurant-catering-wizard .restaurant-catering-menu-list .restaurant-meal-card:hover,
+.restaurant-catering-wizard .restaurant-catering-menu-list .restaurant-meal-card:focus-within,
+.restaurant-meal-plans-wizard .restaurant-meal-plan-meals-list .restaurant-meal-card:hover,
+.restaurant-meal-plans-wizard .restaurant-meal-plan-meals-list .restaurant-meal-card:focus-within {
+	box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12) !important;
+	transform: translateY(-1px) !important;
+}
+
+.restaurant-catering-wizard .restaurant-catering-menu-list .restaurant-meal-card__spice,
+.restaurant-meal-plans-wizard .restaurant-meal-plan-meals-list .restaurant-meal-card__spice {
+	margin: 0;
+	font-size: 0.92rem;
+}
+
 .restaurant-meal-row,
 .restaurant-catering-meal-row {
 	width: 100%;
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
-	align-items: center;
+	display: flex !important;
+	flex-direction: row !important;
+	justify-content: space-between !important;
+	align-items: center !important;
 	gap: 0.75rem;
 }
 
-.restaurant-meal-row__left {
+
+.restaurant-catering-wizard .restaurant-meal-row__left,
+.restaurant-meal-plans-wizard .restaurant-meal-row__left {
 	display: flex;
 	align-items: center;
 	gap: 0.625rem;
@@ -42,17 +68,36 @@
 	gap: 0.2rem;
 }
 
-.restaurant-meal-row__right {
+.restaurant-catering-wizard .restaurant-meal-row__right,
+.restaurant-meal-plans-wizard .restaurant-meal-row__right {
 	display: flex;
 	justify-content: flex-end;
 	align-items: center;
 	margin-left: auto;
 }
 
-.restaurant-meal-row .restaurant-meal-card__image-link,
-.restaurant-meal-row .restaurant-meal-card__image,
-.restaurant-catering-meal-row .restaurant-meal-card__image-link,
-.restaurant-catering-meal-row .restaurant-meal-card__image {
+.restaurant-meal-plan-row__selector {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4rem;
+	white-space: nowrap;
+	margin: 0;
+}
+
+.restaurant-meal-plan-row__selector input[type="checkbox"] {
+	margin: 0;
+}
+
+.restaurant-meal-plan-meals-list .restaurant-meal-plan-row {
+	padding: 0.5rem 0;
+}
+
+.restaurant-catering-wizard .restaurant-meal-row .restaurant-meal-card__image-link,
+.restaurant-catering-wizard .restaurant-meal-row .restaurant-meal-card__image,
+.restaurant-catering-wizard .restaurant-catering-meal-row .restaurant-meal-card__image-link,
+.restaurant-catering-wizard .restaurant-catering-meal-row .restaurant-meal-card__image,
+.restaurant-meal-plans-wizard .restaurant-meal-row .restaurant-meal-card__image-link,
+.restaurant-meal-plans-wizard .restaurant-meal-row .restaurant-meal-card__image {
 	width: 64px;
 	height: 64px;
 	min-width: 64px;
@@ -469,3 +514,69 @@
 	}
 
 }
+
+/* Submission loading indicator */
+@keyframes restaurant-spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
+.restaurant-wizard-submission-status {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background-color: #f8f9fa;
+}
+
+.restaurant-wizard-submission-status.is-success {
+	border-left-color: #28a745;
+	background-color: #f0f9f4;
+	color: #1e5631;
+}
+
+.restaurant-wizard-submission-status.is-error {
+	border-left-color: #dc3545;
+	background-color: #fff5f5;
+	color: #6c0000;
+}
+
+.restaurant-wizard-submission-spinner {
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	border: 2px solid #f3f3f3;
+	border-top: 2px solid #0073aa;
+	border-radius: 50%;
+	animation: restaurant-spin 0.8s linear infinite;
+}
+
+.restaurant-wizard-submission-status.is-success .restaurant-wizard-submission-spinner,
+.restaurant-wizard-submission-status.is-error .restaurant-wizard-submission-spinner {
+	display: none;
+}
+
+.restaurant-wizard-submission-status.is-success::before {
+	content: '✓';
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	font-weight: bold;
+	line-height: 16px;
+	text-align: center;
+	color: #28a745;
+	flex-shrink: 0;
+}
+
+.restaurant-wizard-submission-status.is-error::before {
+	content: '✕';
+	display: inline-block;
+	width: 16px;
+	height: 16px;
+	font-weight: bold;
+	line-height: 16px;
+	text-align: center;
+	color: #dc3545;
+	flex-shrink: 0;
+}
+
+

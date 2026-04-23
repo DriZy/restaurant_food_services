@@ -179,18 +179,16 @@ class Public_Module extends Abstract_Module {
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="2">';
-		echo '<h3>' . esc_html__( 'Step 2: Select Menu Items', 'restaurant-food-services' ) . '</h3>';
+		echo '<h3>' . esc_html__( 'Step 2: Select Menu Items or Describe What You Want', 'restaurant-food-services' ) . '</h3>';
+		
+		// Standard menu list section
+		echo '<div class="restaurant-catering-menu-section" data-menu-section="list">';
 		echo '<div class="restaurant-filters" data-filter-scope="catering">';
 		echo '<button type="button" class="button restaurant-filter-toggle" aria-expanded="false">' . esc_html__( 'Filters', 'restaurant-food-services' ) . '</button>';
 		echo '<div class="restaurant-filters__body">';
 		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Search Items', 'restaurant-food-services' ) . '</label><input type="search" class="restaurant-wizard-input input-text" data-filter-search></p>';
 		echo '</div>';
 		echo '</div>';
-//		echo '<div class="restaurant-catering-price-preview" data-subtotal="0" data-service-fee="0" data-total="0">';
-//		echo '<p><strong>' . esc_html__( 'Subtotal:', 'restaurant-food-services' ) . '</strong> <span class="restaurant-price-subtotal">' . wp_kses_post( wc_price( 0 ) ) . '</span></p>';
-//		echo '<p><strong>' . esc_html__( 'Service Fee:', 'restaurant-food-services' ) . '</strong> <span class="restaurant-price-service-fee">' . wp_kses_post( wc_price( 0 ) ) . '</span></p>';
-//		echo '<p><strong>' . esc_html__( 'Total:', 'restaurant-food-services' ) . '</strong> <span class="restaurant-price-total">' . wp_kses_post( wc_price( 0 ) ) . '</span></p>';
-//		echo '</div>';
 		echo '<div class="restaurant-catering-menu-list" role="list">';
 		if ( empty( $products_by_course ) ) {
 			echo '<p>' . esc_html__( 'No menu items available right now.', 'restaurant-food-services' ) . '</p>';
@@ -205,6 +203,8 @@ class Public_Module extends Abstract_Module {
 					$quantity_id   = 'restaurant-catering-qty-' . $product_id;
 					$product_name  = $product->get_name();
 					$product_link  = $product->get_permalink();
+					$spice_level   = sanitize_text_field( (string) get_post_meta( $product_id, 'spice_level', true ) );
+					$spice_label   = '' !== $spice_level ? ucfirst( $spice_level ) : esc_html__( 'Not specified', 'restaurant-food-services' );
 
 					echo '<article class="restaurant-meal-card restaurant-catering-meal-row restaurant-meal-row" role="listitem" data-product-name="' . esc_attr( strtolower( $product_name ) ) . '">';
 					echo '<div class="restaurant-meal-row__left">';
@@ -214,6 +214,7 @@ class Public_Module extends Abstract_Module {
 					echo '<div class="restaurant-meal-card__content restaurant-meal-row__content">';
 					echo '<h5 class="restaurant-meal-card__title"><a href="' . esc_url( $product_link ) . '">' . esc_html( $product_name ) . '</a></h5>';
 					echo '<div class="restaurant-meal-card__price">' . wp_kses_post( $product->get_price_html() ) . '</div>';
+					echo '<p class="restaurant-meal-card__spice"><strong>' . esc_html__( 'Spice Level:', 'restaurant-food-services' ) . '</strong> ' . esc_html( $spice_label ) . '</p>';
 					echo '</div>';
 					echo '</div>';
 					echo '<div class="restaurant-meal-row__right">';
@@ -230,6 +231,14 @@ class Public_Module extends Abstract_Module {
 			}
 		}
 		echo '</div>';
+		echo '</div>';
+		
+		// Custom description section
+		echo '<div class="restaurant-catering-menu-section" data-menu-section="custom" style="display: none;">';
+		echo '<p class="form-row form-row-wide"><label for="restaurant-catering-custom-description">' . esc_html__( 'Describe What You Want', 'restaurant-food-services' ) . '</label>';
+		echo '<textarea id="restaurant-catering-custom-description" name="custom_description" class="restaurant-wizard-input input-text" rows="6" placeholder="' . esc_attr__( 'Please describe your custom menu requirements, dietary restrictions, and any specific dishes or cuisines you\'d like us to consider...', 'restaurant-food-services' ) . '"></textarea></p>';
+		echo '</div>';
+		
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="3">';
@@ -247,6 +256,10 @@ class Public_Module extends Abstract_Module {
 		echo '<section class="restaurant-wizard-panel" data-step="4">';
 		echo '<h3>' . esc_html__( 'Step 4: Summary', 'restaurant-food-services' ) . '</h3>';
 		echo '<div class="restaurant-wizard-summary"></div>';
+		echo '<div class="restaurant-wizard-submission-status" style="display: none; margin: 15px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #0073aa;">';
+		echo '<span class="restaurant-wizard-submission-spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #0073aa; border-radius: 50%; animation: restaurant-spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle;"></span>';
+		echo '<span class="restaurant-wizard-submission-message"></span>';
+		echo '</div>';
 		echo '<button type="button" class="button restaurant-catering-save-draft">' . esc_html__( 'Save Draft', 'restaurant-food-services' ) . '</button> ';
 		echo '<button type="button" class="button button-primary restaurant-catering-submit">' . esc_html__( 'Submit Catering Request', 'restaurant-food-services' ) . '</button>';
 		echo '</section>';
@@ -312,7 +325,7 @@ class Public_Module extends Abstract_Module {
 
 		echo '<section class="restaurant-wizard-panel" data-step="3">';
 		echo '<h3>' . esc_html__( 'Step 3: Choose Meals', 'restaurant-food-services' ) . '</h3>';
-		echo '<p class="restaurant-wizard-help">' . esc_html__( 'Select your preferred meals from the options below.', 'restaurant-food-services' ) . '</p>';
+		echo '<p class="restaurant-wizard-help">' . esc_html__( 'Enter quantity for each meal you want in your weekly plan.', 'restaurant-food-services' ) . '</p>';
 		echo '<div class="restaurant-filters" data-filter-scope="meal-plans">';
 		echo '<button type="button" class="button restaurant-filter-toggle" aria-expanded="false">' . esc_html__( 'Filters', 'restaurant-food-services' ) . '</button>';
 		echo '<div class="restaurant-filters__body">';
@@ -320,7 +333,7 @@ class Public_Module extends Abstract_Module {
 		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Spice Level', 'restaurant-food-services' ) . '</label><select class="restaurant-wizard-input input-text" data-filter-spice><option value="">' . esc_html__( 'All', 'restaurant-food-services' ) . '</option><option value="mild">' . esc_html__( 'Mild', 'restaurant-food-services' ) . '</option><option value="medium">' . esc_html__( 'Medium', 'restaurant-food-services' ) . '</option><option value="hot">' . esc_html__( 'Hot', 'restaurant-food-services' ) . '</option><option value="extra">' . esc_html__( 'Extra Hot', 'restaurant-food-services' ) . '</option></select></p>';
 		echo '</div>';
 		echo '</div>';
-		echo '<div class="restaurant-meals-grid" role="list">';
+		echo '<div class="restaurant-catering-menu-list restaurant-meal-plan-meals-list" role="list">';
 		if ( empty( $meal_products ) ) {
 			echo '<p>' . esc_html__( 'No meals available right now.', 'restaurant-food-services' ) . '</p>';
 		} else {
@@ -328,18 +341,23 @@ class Public_Module extends Abstract_Module {
 				$product_id  = $product->get_id();
 				$spice_level = sanitize_text_field( (string) get_post_meta( $product_id, 'spice_level', true ) );
 				$spice_label = '' !== $spice_level ? ucfirst( $spice_level ) : __( 'Not specified', 'restaurant-food-services' );
-				echo '<article class="restaurant-meal-card" role="listitem" data-product-name="' . esc_attr( strtolower( $product->get_name() ) ) . '" data-spice-level="' . esc_attr( strtolower( $spice_level ) ) . '">';
-				echo '<label class="restaurant-meal-card__selector">';
-				echo '<input type="checkbox" class="restaurant-meal-select" value="' . esc_attr( (string) $product_id ) . '" data-product-name="' . esc_attr( $product->get_name() ) . '" data-product-price="' . esc_attr( (string) (float) $product->get_price() ) . '">';
-				echo '<span>' . esc_html__( 'Select', 'restaurant-food-services' ) . '</span>';
-				echo '</label>';
-				echo '<a class="restaurant-meal-card__image-link" href="' . esc_url( $product->get_permalink() ) . '">';
+				$quantity_id = 'restaurant-meal-plan-qty-' . $product_id;
+				echo '<article class="restaurant-meal-card restaurant-meal-row restaurant-meal-plan-row" role="listitem" data-product-name="' . esc_attr( strtolower( $product->get_name() ) ) . '" data-spice-level="' . esc_attr( strtolower( $spice_level ) ) . '">';
+				echo '<div class="restaurant-meal-row__left">';
+				echo '<a class="restaurant-meal-card__image-link restaurant-meal-row__image" href="' . esc_url( $product->get_permalink() ) . '">';
 				echo $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'restaurant-meal-card__image' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 				echo '</a>';
-				echo '<div class="restaurant-meal-card__content">';
+				echo '<div class="restaurant-meal-card__content restaurant-meal-row__content">';
 				echo '<h4 class="restaurant-meal-card__title"><a href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->get_name() ) . '</a></h4>';
 				echo '<div class="restaurant-meal-card__price">' . wp_kses_post( $product->get_price_html() ) . '</div>';
 				echo '<p class="restaurant-meal-card__spice"><strong>' . esc_html__( 'Spice Level:', 'restaurant-food-services' ) . '</strong> ' . esc_html( $spice_label ) . '</p>';
+				echo '</div>';
+				echo '</div>';
+				echo '<div class="restaurant-meal-row__right">';
+				echo '<p class="form-row form-row-wide restaurant-menu-qty">';
+				echo '<label class="restaurant-catering-qty-label" for="' . esc_attr( $quantity_id ) . '">' . esc_html__( 'Quantity:', 'restaurant-food-services' ) . '</label>';
+				echo '<input id="' . esc_attr( $quantity_id ) . '" type="number" min="0" value="0" class="restaurant-wizard-input input-text restaurant-meal-plan-quantity" data-product-id="' . esc_attr( (string) $product_id ) . '" data-product-name="' . esc_attr( $product->get_name() ) . '" data-product-price="' . esc_attr( (string) (float) $product->get_price() ) . '" />';
+				echo '</p>';
 				echo '</div>';
 				echo '</article>';
 			}
@@ -521,8 +539,27 @@ class Public_Module extends Abstract_Module {
 	 * @return array<string,string>
 	 */
 	protected function get_catering_offering_options() {
-		return $this->normalize_catering_options_map( get_option( 'restaurant_catering_offering_options', array() ) );
+		$saved_options = $this->normalize_catering_options_map( get_option( 'restaurant_catering_offering_options', array() ) );
+		$default_options = $this->get_default_catering_offering_options();
+
+		foreach ( $default_options as $default_key => $default_label ) {
+			unset( $saved_options[ $default_key ] );
+		}
+
+		return array_merge( $default_options, $saved_options );
 	}
+
+	/**
+	 * Returns default catering offerings always available to customers.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function get_default_catering_offering_options() {
+		return array(
+			'custom_meal_design' => esc_html__( 'Custom Meal Design', 'restaurant-food-services' ),
+		);
+	}
+
 
 	/**
 	 * Returns supported catering service options.
@@ -819,6 +856,7 @@ class Public_Module extends Abstract_Module {
 		$location    = isset( $_POST['location'] ) ? sanitize_text_field( wp_unslash( $_POST['location'] ) ) : '';
 		$serving_style = isset( $_POST['serving_style'] ) ? sanitize_text_field( wp_unslash( $_POST['serving_style'] ) ) : '';
 		$menu_quantities = isset( $_POST['menu_quantities'] ) ? (array) wp_unslash( $_POST['menu_quantities'] ) : array();
+		$custom_description = isset( $_POST['custom_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['custom_description'] ) ) : '';
 		$special_requests = isset( $_POST['special_requests'] ) ? sanitize_textarea_field( wp_unslash( $_POST['special_requests'] ) ) : '';
 		$dietary_requirements = isset( $_POST['dietary_requirements'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dietary_requirements'] ) ) : '';
 		if ( '' === $dietary_requirements && isset( $_POST['dietary_needs'] ) ) {
@@ -848,13 +886,25 @@ class Public_Module extends Abstract_Module {
 			wp_send_json_error( array( 'message' => esc_html__( 'Please provide a valid event date.', 'restaurant-food-services' ) ), 400 );
 		}
 
-		$structured_items = $this->build_structured_catering_items( $menu_quantities );
+		// Check if this is a custom offering
+		$is_custom = strpos( strtolower( $event_type ), 'custom' ) !== false;
 
-		if ( empty( $structured_items ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Please select at least one menu item.', 'restaurant-food-services' ) ), 400 );
+		if ( $is_custom ) {
+			// For custom offerings, validate custom description
+			if ( '' === $custom_description ) {
+				wp_send_json_error( array( 'message' => esc_html__( 'Please describe your custom catering needs.', 'restaurant-food-services' ) ), 400 );
+			}
+			$structured_items = array();
+		} else {
+			// For standard offerings, validate menu items
+			$structured_items = $this->build_structured_catering_items( $menu_quantities );
+
+			if ( empty( $structured_items ) ) {
+				wp_send_json_error( array( 'message' => esc_html__( 'Please select at least one menu item.', 'restaurant-food-services' ) ), 400 );
+			}
 		}
 
-		$pricing     = $this->calculate_catering_pricing_details( $structured_items );
+		$pricing     = $is_custom ? array( 'subtotal' => 0, 'service_fee_percent' => 0, 'service_fee_amount' => 0, 'total' => 0 ) : $this->calculate_catering_pricing_details( $structured_items );
 		$total_price = $pricing['total'];
 		$request_signature = md5(
 			wp_json_encode(
@@ -865,6 +915,7 @@ class Public_Module extends Abstract_Module {
 					'location'              => $location,
 					'serving_style'         => $serving_style,
 					'menu_items'            => $structured_items,
+					'custom_description'    => $custom_description,
 					'special_requests'      => $special_requests,
 					'dietary_requirements'  => $dietary_requirements,
 				)
@@ -952,6 +1003,7 @@ class Public_Module extends Abstract_Module {
 		update_post_meta( $post_id, 'serving_style', $serving_style );
 		update_post_meta( $post_id, 'dietary_requirements', $dietary_requirements );
 		update_post_meta( $post_id, 'dietary_needs', $dietary_requirements );
+		update_post_meta( $post_id, 'custom_description', $custom_description );
 		update_post_meta( $post_id, 'menu_items', wp_json_encode( $structured_items ) );
 		update_post_meta( $post_id, 'selected_items', wp_json_encode( $selected_items ) );
 		update_post_meta( $post_id, 'quantities', wp_json_encode( $quantities ) );
@@ -970,15 +1022,16 @@ class Public_Module extends Abstract_Module {
 		$this->send_catering_request_admin_notification(
 			(int) $post_id,
 			array(
-				'event_type'       => $event_type,
-				'event_date'       => $event_date,
-				'guest_count'      => $guest_count,
-				'location'         => $location,
-				'serving_style'    => $serving_style,
-				'special_requests' => $special_requests,
-				'dietary_needs'    => $dietary_requirements,
-				'menu_items'       => $structured_items,
-				'pricing'          => $pricing,
+				'event_type'            => $event_type,
+				'event_date'            => $event_date,
+				'guest_count'           => $guest_count,
+				'location'              => $location,
+				'serving_style'         => $serving_style,
+				'special_requests'      => $special_requests,
+				'dietary_needs'         => $dietary_requirements,
+				'custom_description'    => $custom_description,
+				'menu_items'            => $structured_items,
+				'pricing'               => $pricing,
 			)
 		);
 
@@ -1109,9 +1162,40 @@ class Public_Module extends Abstract_Module {
 
 		$plan_type      = isset( $_POST['plan_type'] ) ? sanitize_text_field( wp_unslash( $_POST['plan_type'] ) ) : '';
 		$meals_per_week = isset( $_POST['meals_per_week'] ) ? absint( wp_unslash( $_POST['meals_per_week'] ) ) : 0;
-		$selected_meals = isset( $_POST['selected_meals'] ) ? array_map( 'absint', (array) wp_unslash( $_POST['selected_meals'] ) ) : array();
+		$raw_selected_meals = isset( $_POST['selected_meals'] ) ? (array) wp_unslash( $_POST['selected_meals'] ) : array();
+		$selected_meals = array();
+
+		foreach ( $raw_selected_meals as $meal_item ) {
+			$product_id = 0;
+			$quantity   = 0;
+
+			if ( is_array( $meal_item ) ) {
+				$product_id = isset( $meal_item['product_id'] ) ? absint( $meal_item['product_id'] ) : 0;
+				$quantity   = isset( $meal_item['quantity'] ) ? absint( $meal_item['quantity'] ) : 0;
+			} else {
+				$product_id = absint( $meal_item );
+				$quantity   = $product_id > 0 ? 1 : 0;
+			}
+
+			if ( $product_id <= 0 || $quantity <= 0 ) {
+				continue;
+			}
+
+			if ( isset( $selected_meals[ $product_id ] ) ) {
+				$selected_meals[ $product_id ] += $quantity;
+			} else {
+				$selected_meals[ $product_id ] = $quantity;
+			}
+		}
+
 		if ( empty( $selected_meals ) ) {
-			$selected_meals = $this->get_active_weekly_menu_meal_ids();
+			foreach ( $this->get_active_weekly_menu_meal_ids() as $weekly_meal_id ) {
+				$weekly_meal_id = absint( $weekly_meal_id );
+
+				if ( $weekly_meal_id > 0 ) {
+					$selected_meals[ $weekly_meal_id ] = 1;
+				}
+			}
 		}
 		$delivery_location = isset( $_POST['delivery_location'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_location'] ) ) : '';
 		$delivery_latitude = isset( $_POST['delivery_latitude'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_latitude'] ) ) : '';
@@ -1128,7 +1212,7 @@ class Public_Module extends Abstract_Module {
 		}
 
 		if ( empty( $selected_meals ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Please choose at least one meal.', 'restaurant-food-services' ) ), 400 );
+			wp_send_json_error( array( 'message' => esc_html__( 'Please enter quantity for at least one meal.', 'restaurant-food-services' ) ), 400 );
 		}
 
 		if ( '' === $delivery_location ) {
@@ -1211,14 +1295,17 @@ class Public_Module extends Abstract_Module {
 
 		$valid_products = array();
 
-		foreach ( $selected_meals as $product_id ) {
+		foreach ( $selected_meals as $product_id => $quantity ) {
 			$product = wc_get_product( $product_id );
 
 			if ( ! $product || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
 				continue;
 			}
 
-			$valid_products[] = (int) $product_id;
+			$valid_products[] = array(
+				'product_id' => (int) $product_id,
+				'quantity'   => max( 1, absint( $quantity ) ),
+			);
 		}
 
 		if ( empty( $valid_products ) ) {
@@ -1226,8 +1313,15 @@ class Public_Module extends Abstract_Module {
 			wp_send_json_error( array( 'message' => esc_html__( 'Selected meals are unavailable.', 'restaurant-food-services' ) ), 400 );
 		}
 
-		foreach ( $valid_products as $product_id ) {
-			WC()->cart->add_to_cart( $product_id, 1 );
+		foreach ( $valid_products as $meal_item ) {
+			$meal_product_id = isset( $meal_item['product_id'] ) ? absint( $meal_item['product_id'] ) : 0;
+			$meal_quantity   = isset( $meal_item['quantity'] ) ? max( 1, absint( $meal_item['quantity'] ) ) : 1;
+
+			if ( $meal_product_id <= 0 ) {
+				continue;
+			}
+
+			WC()->cart->add_to_cart( $meal_product_id, $meal_quantity );
 		}
 
 		$order = wc_create_order(
@@ -1241,14 +1335,16 @@ class Public_Module extends Abstract_Module {
 			wp_send_json_error( array( 'message' => esc_html__( 'Unable to create your meal plan order right now.', 'restaurant-food-services' ) ), 500 );
 		}
 
-		foreach ( $valid_products as $product_id ) {
-			$product = wc_get_product( $product_id );
+		foreach ( $valid_products as $meal_item ) {
+			$product_id = isset( $meal_item['product_id'] ) ? absint( $meal_item['product_id'] ) : 0;
+			$quantity   = isset( $meal_item['quantity'] ) ? max( 1, absint( $meal_item['quantity'] ) ) : 1;
+			$product    = wc_get_product( $product_id );
 
 			if ( ! $product instanceof \WC_Product ) {
 				continue;
 			}
 
-			$order->add_product( $product, 1 );
+			$order->add_product( $product, $quantity );
 		}
 
 		$selection = array(

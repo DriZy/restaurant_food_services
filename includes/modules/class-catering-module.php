@@ -318,6 +318,10 @@ class Catering_Module extends Abstract_Module {
 					wp_send_json_error( array( 'message' => esc_html__( 'New label is required.', 'restaurant-food-services' ) ), 400 );
 				}
 
+				if ( $this->is_default_catering_offering_option_key( $option_name, $key ) ) {
+					wp_send_json_error( array( 'message' => esc_html__( 'Default catering offerings cannot be renamed.', 'restaurant-food-services' ) ), 400 );
+				}
+
 				$options[ $key ] = $label;
 				$message         = esc_html__( 'Option renamed successfully.', 'restaurant-food-services' );
 				break;
@@ -327,6 +331,10 @@ class Catering_Module extends Abstract_Module {
 
 				if ( '' === $key || ! isset( $options[ $key ] ) ) {
 					wp_send_json_error( array( 'message' => esc_html__( 'Selected option no longer exists.', 'restaurant-food-services' ) ), 404 );
+				}
+
+				if ( $this->is_default_catering_offering_option_key( $option_name, $key ) ) {
+					wp_send_json_error( array( 'message' => esc_html__( 'Default catering offerings cannot be deleted.', 'restaurant-food-services' ) ), 400 );
 				}
 
 				unset( $options[ $key ] );
@@ -426,10 +434,14 @@ class Catering_Module extends Abstract_Module {
 						</tr>
 					<?php else : ?>
 						<?php foreach ( $current_rows as $option_key => $option_label ) : ?>
+										<?php $is_default_offering = $this->is_default_catering_offering_option_key( $option_name, $option_key ); ?>
 							<tr>
 								<td><?php echo esc_html( $option_label ); ?></td>
 								<td><code><?php echo esc_html( $option_key ); ?></code></td>
 								<td>
+												<?php if ( $is_default_offering ) : ?>
+													<span class="description"><?php esc_html_e( 'Default option', 'restaurant-food-services' ); ?></span>
+												<?php else : ?>
 									<form method="post" class="restaurant-catering-settings-row-actions">
 										<?php wp_nonce_field( 'restaurant_catering_settings_options', 'restaurant_catering_settings_nonce' ); ?>
 										<input type="hidden" name="option_name" value="<?php echo esc_attr( $option_name ); ?>">
@@ -449,6 +461,7 @@ class Catering_Module extends Abstract_Module {
 										</button>
 										<button type="submit" class="button button-link-delete restaurant-catering-settings-delete-button"><?php esc_html_e( 'Delete', 'restaurant-food-services' ); ?></button>
 									</form>
+												<?php endif; ?>
 								</td>
 							</tr>
 						<?php endforeach; ?>
@@ -531,7 +544,30 @@ class Catering_Module extends Abstract_Module {
 			return array();
 		}
 
-		return $this->normalize_catering_settings_options_map( get_option( $option_name, array() ) );
+		$options = $this->normalize_catering_settings_options_map( get_option( $option_name, array() ) );
+
+		if ( 'restaurant_catering_offering_options' !== $option_name ) {
+			return $options;
+		}
+
+		$default_options = $this->get_default_catering_offering_options();
+
+		foreach ( $default_options as $default_key => $default_label ) {
+			unset( $options[ $default_key ] );
+		}
+
+		return array_merge( $default_options, $options );
+	}
+
+	/**
+	 * Returns default catering offerings that are always available.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function get_default_catering_offering_options() {
+		return array(
+			'custom_meal_design' => esc_html__( 'Custom Meal Design', 'restaurant-food-services' ),
+		);
 	}
 
 	/**
@@ -544,7 +580,34 @@ class Catering_Module extends Abstract_Module {
 	 */
 	protected function save_catering_settings_options( $option_name, $options ) {
 		$normalized = $this->normalize_catering_settings_options_map( $options );
+
+		if ( 'restaurant_catering_offering_options' === $option_name ) {
+			$default_options = $this->get_default_catering_offering_options();
+
+			foreach ( $default_options as $default_key => $default_label ) {
+				unset( $normalized[ $default_key ] );
+			}
+		}
+
 		update_option( $option_name, $normalized );
+	}
+
+	/**
+	 * Checks if the provided key belongs to an immutable default catering offering.
+	 *
+	 * @param string $option_name Option name.
+	 * @param string $option_key  Option key.
+	 *
+	 * @return bool
+	 */
+	protected function is_default_catering_offering_option_key( $option_name, $option_key ) {
+		if ( 'restaurant_catering_offering_options' !== $option_name ) {
+			return false;
+		}
+
+		$defaults = $this->get_default_catering_offering_options();
+
+		return isset( $defaults[ sanitize_key( (string) $option_key ) ] );
 	}
 
 	/**

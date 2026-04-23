@@ -5,6 +5,8 @@
  * Description: A production-ready WordPress plugin scaffold for Restaurant Food Services Plugin.
  * Version: 1.0.0
  * Author: Tabi Idris
+ * Requires at least: 5.8
+ * Requires PHP: 7.2
  * Text Domain: restaurant-food-services
  * Domain Path: /languages
  *

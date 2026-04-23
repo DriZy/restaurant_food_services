@@ -1,6 +1,10 @@
 (function ($) {
 	'use strict';
 
+	if (typeof RestaurantFoodServicesCateringSettings === 'undefined') {
+		return;
+	}
+
 	var $modal;
 
 	function ensureModal() {
@@ -15,13 +19,14 @@
 
 	function renderNotice(message, type) {
 		var $container = $('.restaurant-catering-settings-notices');
+		var safeMessage = $('<div />').text(message || '').html();
 		var noticeClass = 'notice-error';
 
 		if ('success' === type) {
 			noticeClass = 'notice-success';
 		}
 
-		$container.html('<div class="notice ' + noticeClass + ' is-dismissible"><p>' + message + '</p></div>');
+		$container.html('<div class="notice ' + noticeClass + ' is-dismissible"><p>' + safeMessage + '</p></div>');
 	}
 
 	function openRenameModal($button) {
@@ -34,8 +39,9 @@
 		$modalForm.find('input[name="option_name"]').val($button.data('option-name'));
 		$modalForm.find('input[name="option_key"]').val($button.data('option-key'));
 		$modalForm.find('input[name="rename_label"]').val($button.data('option-label'));
-		$modalForm.find('input[name="offering_page"]').val($form.find('input[name="offering_page"]').val() || '1');
-		$modalForm.find('input[name="service_page"]').val($form.find('input[name="service_page"]').val() || '1');
+		$modalForm.find('input[name="offering_page"]').val($button.data('offering-page') || $form.find('input[name="offering_page"]').val() || '1');
+		$modalForm.find('input[name="service_page"]').val($button.data('service-page') || $form.find('input[name="service_page"]').val() || '1');
+		$modalForm.find('input[name="course_page"]').val($button.data('course-page') || $form.find('input[name="course_page"]').val() || '1');
 
 		$modal.prop('hidden', false).addClass('is-open');
 		$modal.find('#restaurant-catering-settings-modal-input').trigger('focus').trigger('select');
@@ -108,6 +114,17 @@
 		sendAjaxForm($(this));
 	});
 
+	$(document).on('submit', '.restaurant-catering-settings-row-actions', function (event) {
+		if (
+			$(this).find('input[name="operation"]').val() === 'delete' &&
+			typeof RestaurantFoodServicesCateringSettings.confirmDelete === 'string' &&
+			!window.confirm(RestaurantFoodServicesCateringSettings.confirmDelete)
+		) {
+			event.preventDefault();
+			return;
+		}
+	});
+
 	$(document).on('click', '.restaurant-catering-settings-rename-button', function (event) {
 		event.preventDefault();
 		openRenameModal($(this));
@@ -120,6 +137,12 @@
 
 	$(document).on('keydown', function (event) {
 		if (event.key === 'Escape') {
+			closeRenameModal();
+		}
+	});
+
+	$(document).on('click', '.restaurant-catering-settings-modal', function (event) {
+		if ($(event.target).hasClass('restaurant-catering-settings-modal')) {
 			closeRenameModal();
 		}
 	});

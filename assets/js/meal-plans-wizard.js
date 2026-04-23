@@ -43,6 +43,11 @@
 			planType: '',
 			mealsPerWeek: 0,
 			selectedMeals: [],
+			deliveryLocation: {
+				formattedAddress: '',
+				latitude: '',
+				longitude: ''
+			},
 			deliveryDays: [],
 			deliveryTime: 'morning'
 		};
@@ -54,7 +59,13 @@
 		this.$submit = this.$root.find('.restaurant-wizard-submit');
 		this.$summary = this.$root.find('.restaurant-wizard-summary');
 		this.$sidebar = this.$root.find('[data-summary-sidebar="meal-plans"]');
+		this.$locationInput = this.$root.find('input[name="delivery_location"]');
+		this.$locationLatitude = this.$root.find('input[name="delivery_latitude"]');
+		this.$locationLongitude = this.$root.find('input[name="delivery_longitude"]');
+		this.$locationSuggestions = this.$root.find('.restaurant-location-suggestions');
 		this.summarySidebar = null;
+		this.locationSearchTimer = null;
+		this.locationRequest = null;
 	}
 
 	MealPlansWizard.prototype.init = function () {
@@ -101,6 +112,42 @@
 
 		this.$root.on('change', 'select[name="delivery_time"]', function () {
 			self.state.deliveryTime = ($(this).val() || 'morning').toString();
+			self.updateSidebar();
+		});
+
+		this.$root.on('input', 'input[name="delivery_location"]', function () {
+			var query = ($(this).val() || '').toString().trim();
+			self.state.deliveryLocation.formattedAddress = query;
+			self.state.deliveryLocation.latitude = '';
+			self.state.deliveryLocation.longitude = '';
+			self.$locationLatitude.val('');
+			self.$locationLongitude.val('');
+
+			if (self.locationSearchTimer) {
+				window.clearTimeout(self.locationSearchTimer);
+			}
+
+			if (query.length < 3) {
+				self.renderLocationSuggestions([]);
+				self.updateSidebar();
+				return;
+			}
+
+			self.locationSearchTimer = window.setTimeout(function () {
+				self.searchLocations(query);
+			}, 250);
+			self.updateSidebar();
+		});
+
+		this.$root.on('click', '.restaurant-location-suggestion', function () {
+			var $item = $(this);
+			self.state.deliveryLocation.formattedAddress = ($item.data('address') || '').toString();
+			self.state.deliveryLocation.latitude = ($item.data('lat') || '').toString();
+			self.state.deliveryLocation.longitude = ($item.data('lng') || '').toString();
+			self.$locationInput.val(self.state.deliveryLocation.formattedAddress);
+			self.$locationLatitude.val(self.state.deliveryLocation.latitude);
+			self.$locationLongitude.val(self.state.deliveryLocation.longitude);
+			self.renderLocationSuggestions([]);
 			self.updateSidebar();
 		});
 
@@ -155,7 +202,78 @@
 			return false;
 		}
 
+		if (step === 4 && !this.state.deliveryLocation.formattedAddress) {
+			setInlineError(this.$locationInput, 'Please provide a delivery location.');
+			notify('Please provide a delivery location.', 'error');
+			return false;
+		}
+
+		if (step === 4 && ('' === this.state.deliveryLocation.latitude || '' === this.state.deliveryLocation.longitude)) {
+			setInlineError(this.$locationInput, 'Please select a location from suggestions.');
+			notify('Please select a location from suggestions.', 'error');
+			return false;
+		}
+
 		return true;
+	};
+
+	MealPlansWizard.prototype.searchLocations = function (query) {
+		var self = this;
+		var cfg = window.RestaurantFoodServicesPublic || {};
+		if (!cfg.ajaxUrl || !cfg.locationSearchNonce) {
+			self.renderLocationSuggestions([]);
+			return;
+		}
+
+		if (self.locationRequest && self.locationRequest.readyState !== 4) {
+			self.locationRequest.abort();
+		}
+
+		self.locationRequest = $.ajax({
+			url: cfg.ajaxUrl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: 'restaurant_location_autocomplete',
+				nonce: cfg.locationSearchNonce,
+				q: query
+			}
+		}).done(function (response) {
+			if (!response || !response.success || !response.data || !Array.isArray(response.data.items)) {
+				self.renderLocationSuggestions([]);
+				return;
+			}
+
+			self.renderLocationSuggestions(response.data.items);
+		}).fail(function () {
+			self.renderLocationSuggestions([]);
+		});
+	};
+
+	MealPlansWizard.prototype.renderLocationSuggestions = function (suggestions) {
+		if (!this.$locationSuggestions.length) {
+			return;
+		}
+
+		if (!Array.isArray(suggestions) || !suggestions.length) {
+			this.$locationSuggestions.empty().attr('hidden', true);
+			return;
+		}
+
+		var html = '<ul class="restaurant-location-suggestions__list">';
+		suggestions.forEach(function (item) {
+			if (!item || !item.formatted_address) {
+				return;
+			}
+
+			var address = escapeHtml(item.formatted_address.toString());
+			var lat = escapeHtml((item.latitude || '').toString());
+			var lng = escapeHtml((item.longitude || '').toString());
+			html += '<li><button type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</button></li>';
+		});
+		html += '</ul>';
+
+		this.$locationSuggestions.html(html).attr('hidden', false);
 	};
 
 	MealPlansWizard.prototype.updateSidebar = function () {
@@ -195,6 +313,7 @@
 		this.$prev.prop('disabled', this.currentStep === 1);
 		this.$next.toggle(this.currentStep < 5);
 		this.$submit.toggle(this.currentStep === 5);
+		this.$root.toggleClass('is-summary-step', this.currentStep === 5);
 
 		if (this.currentStep === 5) {
 			this.renderSummary();
@@ -223,11 +342,18 @@
 		}
 
 		var html = '';
-		html += '<p><strong>Plan Type:</strong> ' + (this.state.planType || '-') + '</p>';
-		html += '<p><strong>Meals Per Week:</strong> ' + (this.state.mealsPerWeek || '-') + '</p>';
-		html += '<div class="restaurant-selected-meals-summary"><p><strong>Meals Selected:</strong> ' + selectedMeals.length + '</p>' + mealCardsHtml + '</div>';
-		html += '<p><strong>Delivery Days:</strong> ' + (this.state.deliveryDays.join(', ') || '-') + '</p>';
-		html += '<p><strong>Delivery Time:</strong> ' + (this.state.deliveryTime || '-') + '</p>';
+		html += '<section class="restaurant-summary-panel">';
+		html += '<h4>Meal Plan Summary</h4>';
+		html += '<div class="restaurant-summary-grid">';
+		html += '<article class="restaurant-summary-item"><strong>Plan Type</strong><span>' + escapeHtml(this.state.planType || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Meals Per Week</strong><span>' + escapeHtml((this.state.mealsPerWeek || '-').toString()) + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Delivery Location</strong><span>' + escapeHtml(this.state.deliveryLocation.formattedAddress || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Delivery Days</strong><span>' + escapeHtml(this.state.deliveryDays.join(', ') || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Delivery Time</strong><span>' + escapeHtml(this.state.deliveryTime || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Meals Selected</strong><span>' + escapeHtml(selectedMeals.length.toString()) + '</span></article>';
+		html += '</div>';
+		html += '<div class="restaurant-selected-meals-summary"><h5>Selected Meals</h5>' + mealCardsHtml + '</div>';
+		html += '</section>';
 		this.$summary.html(html);
 	};
 
@@ -276,6 +402,9 @@
 				plan_type: this.state.planType,
 				meals_per_week: this.state.mealsPerWeek,
 				selected_meals: this.state.selectedMeals,
+				delivery_location: this.state.deliveryLocation.formattedAddress,
+				delivery_latitude: this.state.deliveryLocation.latitude,
+				delivery_longitude: this.state.deliveryLocation.longitude,
 				delivery_days: this.state.deliveryDays,
 				delivery_time: this.state.deliveryTime
 			}
@@ -286,6 +415,9 @@
 						setCartCount(response.data.cart_count);
 					}
 					notify((response.data && response.data.message) ? response.data.message : 'Meal plan saved.', 'success');
+								if (response.data && response.data.checkout_url) {
+									window.location.href = response.data.checkout_url;
+								}
 					return;
 				}
 

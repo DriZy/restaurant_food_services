@@ -1,0 +1,91 @@
+.restaurant-catering-settings-grid {
+	display: block;
+	gap: 20px;
+	grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+	align-items: start;
+}
+
+.restaurant-catering-settings-section {
+	margin: 1.5rem auto;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	padding: 16px;
+}
+
+.restaurant-catering-settings-section h2 {
+	margin-top: 0;
+}
+
+.restaurant-catering-settings-inline-form {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 12px;
+}
+
+.restaurant-catering-settings-inline-form .regular-text {
+	max-width: 100%;
+	flex: 1 1 auto;
+}
+
+.restaurant-catering-settings-row-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
+.restaurant-catering-settings-pagination {
+	display: flex;
+	gap: 6px;
+	margin-top: 12px;
+	flex-wrap: wrap;
+}
+
+.restaurant-catering-settings-pagination-form {
+	margin: 0;
+}
+
+.restaurant-catering-settings-modal[hidden] {
+	display: none;
+}
+
+.restaurant-catering-settings-modal {
+	position: fixed;
+	inset: 0;
+	z-index: 100000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.restaurant-catering-settings-modal__backdrop {
+	position: absolute;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.45);
+}
+
+.restaurant-catering-settings-modal__dialog {
+	position: relative;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	padding: 16px;
+	width: min(96vw, 520px);
+	box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+}
+
+.restaurant-catering-settings-modal__dialog h2 {
+	margin: 0 0 12px;
+}
+
+.restaurant-catering-settings-modal__dialog .regular-text {
+	width: 100%;
+}
+
+.restaurant-catering-settings-modal__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 12px;
+}
+

@@ -39,7 +39,7 @@ class Meals_Module extends Abstract_Module {
 		$loader->add_action( 'woocommerce_product_data_panels', $this, 'render_meals_product_data_panel' );
 		$loader->add_action( 'woocommerce_process_product_meta', $this, 'save_meals_product_meta' );
 		$loader->add_action( 'woocommerce_single_product_summary', $this, 'render_meals_product_summary' );
-		$loader->add_action( 'admin_footer', $this, 'render_meal_plan_admin_script' );
+		$loader->add_action( 'admin_enqueue_scripts', $this, 'enqueue_meal_plan_admin_assets' );
 	}
 
 	/**
@@ -118,6 +118,18 @@ class Meals_Module extends Abstract_Module {
 						'no'  => esc_html__( 'No', 'restaurant-food-services' ),
 						'yes' => esc_html__( 'Yes', 'restaurant-food-services' ),
 					),
+				)
+			);
+		}
+
+		if ( function_exists( 'woocommerce_wp_select' ) ) {
+			woocommerce_wp_select(
+				array(
+					'id'          => 'meal_course',
+					'label'       => esc_html__( 'Meal Course', 'restaurant-food-services' ),
+					'description' => esc_html__( 'Assign this meal to a catering course group.', 'restaurant-food-services' ),
+					'desc_tip'    => true,
+					'options'     => $this->get_meal_course_field_options(),
 				)
 			);
 		}
@@ -209,32 +221,76 @@ class Meals_Module extends Abstract_Module {
 		$this->update_product_meta_field( $post_id, 'preparation_time', 'sanitize_text_field' );
 		$this->update_product_meta_field( $post_id, 'spice_level', 'sanitize_text_field' );
 		$this->update_product_meta_field( $post_id, 'ingredients', 'sanitize_textarea_field' );
+		$this->update_product_meta_field( $post_id, 'meal_course', 'sanitize_key' );
 	}
 
 	/**
-	 * Toggles meal plan dependent fields in WooCommerce product admin.
+	 * Returns meal course options for the product admin field.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function get_meal_course_field_options() {
+		$options = array(
+			'' => esc_html__( 'Select a meal course', 'restaurant-food-services' ),
+		);
+
+		$raw_options = get_option( 'restaurant_catering_meal_course_options', array() );
+
+		if ( ! is_array( $raw_options ) ) {
+			return $options;
+		}
+
+		foreach ( $raw_options as $value => $label ) {
+			if ( is_array( $label ) ) {
+				$value = isset( $label['value'] ) ? $label['value'] : ( isset( $label['key'] ) ? $label['key'] : '' );
+				$label = isset( $label['label'] ) ? $label['label'] : '';
+			}
+
+			$normalized_key   = sanitize_key( (string) $value );
+			$normalized_label = sanitize_text_field( (string) $label );
+
+			if ( '' === $normalized_key || '' === $normalized_label ) {
+				continue;
+			}
+
+			$options[ $normalized_key ] = $normalized_label;
+		}
+
+		return $options;
+	}
+
+	/**
+	 * Enqueues meal-plan admin UI script in both Classic and block-based editors.
+	 *
+	 * @param string $hook_suffix Current admin page hook.
 	 *
 	 * @return void
 	 */
-	public function render_meal_plan_admin_script() {
-		$screen = get_current_screen();
-
-		if ( ! $screen || 'product' !== $screen->id ) {
+	public function enqueue_meal_plan_admin_assets( $hook_suffix ) {
+		if ( ! in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) {
 			return;
 		}
-		?>
-		<script type="text/javascript">
-			jQuery(function($) {
-				function toggleMealPlanFields() {
-					var isMealPlan = $('#is_meal_plan').is(':checked');
-					$('.show_if_meal_plan').toggle(isMealPlan);
-				}
 
-				toggleMealPlanFields();
-				$(document).on('change', '#is_meal_plan', toggleMealPlanFields);
-			});
-		</script>
-		<?php
+		$screen = get_current_screen();
+
+		if ( ! $screen || 'product' !== $screen->post_type ) {
+			return;
+		}
+
+		$script_path = dirname( dirname( __DIR__ ) ) . '/assets/js/meals-admin.js';
+		$version     = defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0';
+
+		if ( file_exists( $script_path ) ) {
+			$version = (string) filemtime( $script_path );
+		}
+
+		wp_enqueue_script(
+			'restaurant-food-services-meals-admin',
+			RESTAURANT_FOOD_SERVICES_URL . 'assets/js/meals-admin.js',
+			array( 'jquery' ),
+			$version,
+			true
+		);
 	}
 
 	/**

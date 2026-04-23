@@ -5,7 +5,7 @@
  * @package RestaurantFoodServices
  */
 
-namespace Restaurant\FoodServices\Public;
+namespace Restaurant\FoodServices\Frontend;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;

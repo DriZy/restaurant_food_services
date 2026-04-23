@@ -39,39 +39,7 @@
 		this.$root = $root;
 		this.$items = this.$root.find('.restaurant-summary-sidebar__items');
 		this.$total = this.$root.find('.restaurant-summary-sidebar__total-value');
-		this.$modal = null;
-		this.$modalItems = null;
-		this.$modalTotal = null;
-		this.$trigger = null;
-
-		this.initMobileModal();
 	}
-
-	SummarySidebar.prototype.isMobile = function () {
-		return window.matchMedia('(max-width: 768px)').matches;
-	};
-
-	SummarySidebar.prototype.initMobileModal = function () {
-		var self = this;
-		this.$modal = $('<div class="restaurant-summary-modal" aria-hidden="true"><div class="restaurant-summary-modal__backdrop"></div><div class="restaurant-summary-modal__dialog"><button type="button" class="restaurant-summary-modal__close" aria-label="Close">&times;</button><h4>Summary</h4><ul class="restaurant-summary-sidebar__items"></ul><p class="restaurant-summary-sidebar__total"><strong>Total Price:</strong> <span class="restaurant-summary-sidebar__total-value">$0.00</span></p></div></div>');
-		$('body').append(this.$modal);
-		this.$modalItems = this.$modal.find('.restaurant-summary-sidebar__items');
-		this.$modalTotal = this.$modal.find('.restaurant-summary-sidebar__total-value');
-
-		this.$trigger = $('<button type="button" class="restaurant-summary-mobile-trigger">View Summary</button>');
-		this.$root.before(this.$trigger);
-
-		this.$trigger.on('click', function () {
-			if (!self.isMobile()) {
-				return;
-			}
-			self.$modal.addClass('is-open').attr('aria-hidden', 'false');
-		});
-
-		this.$modal.on('click', '.restaurant-summary-modal__close, .restaurant-summary-modal__backdrop', function () {
-			self.$modal.removeClass('is-open').attr('aria-hidden', 'true');
-		});
-	};
 
 	SummarySidebar.prototype.update = function (payload) {
 		var items = (payload && payload.items) ? payload.items : [];
@@ -89,19 +57,15 @@
 		}
 
 		this.$total.html(totalHtml);
-		if (this.$modalItems && this.$modalTotal) {
-			this.$modalItems.html(this.$items.html());
-			this.$modalTotal.html(totalHtml);
-		}
 	};
 
 	function applyFilters($scope) {
 		var searchTerm = (($scope.find('[data-filter-search]').val() || '').toString()).toLowerCase();
 		var spiceValue = (($scope.find('[data-filter-spice]').val() || '').toString()).toLowerCase();
-		var $grid = $scope.nextAll('.restaurant-meals-grid').first();
+		var $grid = $scope.nextAll('.restaurant-catering-menu-list, .restaurant-meals-grid').first();
 
 		if (!$grid.length) {
-			$grid = $scope.closest('.restaurant-wizard-panel, .restaurant-order-meals').find('.restaurant-meals-grid').first();
+			$grid = $scope.closest('.restaurant-wizard-panel, .restaurant-order-meals').find('.restaurant-catering-menu-list, .restaurant-meals-grid').first();
 		}
 
 		$grid.find('.restaurant-meal-card').each(function () {
@@ -111,6 +75,12 @@
 			var matchSearch = !searchTerm || name.indexOf(searchTerm) !== -1;
 			var matchSpice = !spiceValue || spice === spiceValue;
 			$card.toggle(matchSearch && matchSpice);
+		});
+
+		$grid.find('.restaurant-meal-course-group').each(function () {
+			var $group = $(this);
+			var hasVisibleItems = $group.find('.restaurant-meal-card:visible').length > 0;
+			$group.toggle(hasVisibleItems);
 		});
 	}
 

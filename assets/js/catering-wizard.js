@@ -32,6 +32,10 @@
 		return selected.getTime() > today.getTime();
 	}
 
+	function escapeHtml(value) {
+		return $('<div />').text((value || '').toString()).html();
+	}
+
 	function CateringWizard($root) {
 		this.$root = $root;
 		this.currentStep = 1;
@@ -271,7 +275,7 @@
 			}
 
 			if (Object.keys(this.state.menuQuantities).length === 0) {
-				setInlineError(this.$root.find('.restaurant-meals-grid').first(), 'Please select at least one menu item quantity.');
+				setInlineError(this.$root.find('.restaurant-catering-menu-list, .restaurant-meals-grid').first(), 'Please select at least one menu item quantity.');
 				notify('Please select at least one menu item quantity.', 'error');
 				return false;
 			}
@@ -300,6 +304,7 @@
 
 		this.$prev.prop('disabled', this.currentStep === 1);
 		this.$next.toggle(this.currentStep < 4);
+		this.$root.toggleClass('is-summary-step', this.currentStep === 4);
 
 		if (this.currentStep === 4) {
 			this.renderSummary();
@@ -307,25 +312,50 @@
 	};
 
 	CateringWizard.prototype.renderSummary = function () {
+		var self = this;
 		var itemCount = 0;
 		var qtyTotal = 0;
+		var mealCards = '';
 		Object.keys(this.state.menuQuantities).forEach(function (key) {
 			itemCount += 1;
-			qtyTotal += parseInt(this.state.menuQuantities[key], 10) || 0;
+			var qty = parseInt(self.state.menuQuantities[key], 10) || 0;
+			qtyTotal += qty;
+			if (qty > 0) {
+				var $input = self.$root.find('.restaurant-menu-quantity[data-product-id="' + key + '"]');
+				var name = ($input.data('product-name') || ('Item #' + key)).toString();
+				mealCards += '<article class="restaurant-selected-meal-card">';
+				mealCards += '<h6 class="restaurant-selected-meal-card__title">' + escapeHtml(name) + '</h6>';
+				mealCards += '<strong class="restaurant-selected-meal-card__price">Qty: ' + qty + '</strong>';
+				mealCards += '</article>';
+			}
 		}, this);
 
+		if (mealCards) {
+			mealCards = '<div class="restaurant-selected-meals-cards">' + mealCards + '</div>';
+		} else {
+			mealCards = '<p>-</p>';
+		}
+
 		var html = '';
-		html += '<p><strong>Event Type:</strong> ' + (this.state.eventType || '-') + '</p>';
-		html += '<p><strong>Event Date:</strong> ' + (this.state.eventDate || '-') + '</p>';
-		html += '<p><strong>Guest Count:</strong> ' + (this.state.guestCount || '-') + '</p>';
-		html += '<p><strong>Location:</strong> ' + (this.state.location || '-') + '</p>';
-		html += '<p><strong>Service Option:</strong> ' + (this.state.servingStyle || '-') + '</p>';
-		html += '<p><strong>Menu Items:</strong> ' + itemCount + ' (' + qtyTotal + ' total qty)</p>';
-		html += '<p><strong>Special Requests:</strong> ' + (this.state.specialRequests || '-') + '</p>';
-		html += '<p><strong>Dietary Needs:</strong> ' + (this.state.dietaryNeeds || '-') + '</p>';
-		html += '<p><strong>Subtotal:</strong> ' + this.state.pricing.subtotalHtml + '</p>';
-		html += '<p><strong>Service Fee (' + this.state.pricing.serviceFeePercent + '%):</strong> ' + this.state.pricing.serviceFeeHtml + '</p>';
-		html += '<p><strong>Total:</strong> ' + this.state.pricing.totalHtml + '</p>';
+		html += '<section class="restaurant-summary-panel">';
+		html += '<h4>Event Summary</h4>';
+		html += '<div class="restaurant-summary-grid">';
+		html += '<article class="restaurant-summary-item"><strong>Event Type</strong><span>' + escapeHtml(this.state.eventType || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Event Date</strong><span>' + escapeHtml(this.state.eventDate || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Guest Count</strong><span>' + escapeHtml((this.state.guestCount || '-').toString()) + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Location</strong><span>' + escapeHtml(this.state.location || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Service Option</strong><span>' + escapeHtml(this.state.servingStyle || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Menu Items</strong><span>' + escapeHtml((itemCount + ' items (' + qtyTotal + ' qty)').toString()) + '</span></article>';
+		html += '</div>';
+		html += '<div class="restaurant-selected-meals-summary"><h5>Selected Meals</h5>' + mealCards + '</div>';
+		html += '<div class="restaurant-summary-grid">';
+		html += '<article class="restaurant-summary-item"><strong>Special Requests</strong><span>' + escapeHtml(this.state.specialRequests || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Dietary Needs</strong><span>' + escapeHtml(this.state.dietaryNeeds || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><h6>Subtotal</h6><span>' + this.state.pricing.subtotalHtml + '</span></article>';
+		html += '<article class="restaurant-summary-item"><h6>Service Fee (' + escapeHtml(this.state.pricing.serviceFeePercent.toString()) + '%)</h6><span>' + this.state.pricing.serviceFeeHtml + '</span></article>';
+		html += '<article class="restaurant-summary-item"><h6>Total</h6><span>' + this.state.pricing.totalHtml + '</span></article>';
+		html += '</div>';
+		html += '</section>';
 		this.$summary.html(html);
 	};
 

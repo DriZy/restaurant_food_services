@@ -46,6 +46,7 @@ require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/public/class-catering-pag
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-module-interface.php';
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-abstract-module.php';
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-public-module.php';
+require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-account-module.php';
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-meals-module.php';
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-subscriptions-module.php';
 require_once RESTAURANT_FOOD_SERVICES_PATH . 'includes/modules/class-catering-module.php';

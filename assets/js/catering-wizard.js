@@ -84,10 +84,60 @@
 		}
 
 		this.bindEvents();
+		this.hydrateFromDraft();
 		this.syncUI();
 		this.toggleCustomOfferingSection();
 		this.updatePricePreview();
 		this.updateSidebar();
+	};
+
+	CateringWizard.prototype.hydrateFromDraft = function () {
+		var cfg = this.getAjaxConfig();
+		var payload = cfg && cfg.cateringDraftPayload ? cfg.cateringDraftPayload : null;
+
+		if (!payload || typeof payload !== 'object' || !payload.draftId) {
+			return;
+		}
+
+		this.state.eventType = (payload.eventType || '').toString();
+		this.state.eventDate = (payload.eventDate || '').toString();
+		this.state.guestCount = parseInt(payload.guestCount, 10) || 0;
+		this.state.location = (payload.location || '').toString();
+		this.state.servingStyle = (payload.servingStyle || '').toString();
+		this.state.customDescription = (payload.customDescription || '').toString();
+		this.state.specialRequests = (payload.specialRequests || '').toString();
+		this.state.dietaryNeeds = (payload.dietaryNeeds || '').toString();
+		this.state.menuQuantities = {};
+
+		if (payload.menuQuantities && typeof payload.menuQuantities === 'object') {
+			Object.keys(payload.menuQuantities).forEach(function (key) {
+				var quantity = parseInt(payload.menuQuantities[key], 10) || 0;
+				if (quantity > 0) {
+					this.state.menuQuantities[key] = quantity;
+				}
+			}, this);
+		}
+
+		this.applyStateToForm();
+		notify('Loaded your saved catering draft.', 'success');
+	};
+
+	CateringWizard.prototype.applyStateToForm = function () {
+		this.$root.find('[name="event_type"]').val(this.state.eventType).trigger('change');
+		this.$root.find('[name="event_date"]').val(this.state.eventDate);
+		this.$root.find('[name="guest_count"]').val(this.state.guestCount > 0 ? this.state.guestCount : '');
+		this.$root.find('[name="location"]').val(this.state.location);
+		this.$root.find('[name="serving_style"]').val(this.state.servingStyle);
+		this.$root.find('[name="custom_description"]').val(this.state.customDescription);
+		this.$root.find('[name="special_requests"]').val(this.state.specialRequests);
+		this.$root.find('[name="dietary_needs"]').val(this.state.dietaryNeeds);
+
+		this.$root.find('.restaurant-menu-quantity').each(function () {
+			var $input = $(this);
+			var productId = ($input.data('product-id') || '').toString();
+			var quantity = parseInt((this.state.menuQuantities[productId] || 0), 10) || 0;
+			$input.val(quantity > 0 ? quantity : 0);
+		}.bind(this));
 	};
 
 	CateringWizard.prototype.bindEvents = function () {
@@ -245,16 +295,16 @@
 		if (step === 1) {
 			if (!this.state.eventType || !this.state.eventDate || this.state.guestCount <= 0 || !this.state.location) {
 				if (!this.state.eventType) {
-					setInlineError(this.$root.find('input[name="event_type"]'), 'Event type is required.');
+					setInlineError(this.$root.find('[name="event_type"]'), 'Event type is required.');
 				}
 				if (!this.state.eventDate) {
-					setInlineError(this.$root.find('input[name="event_date"]'), 'Event date is required.');
+					setInlineError(this.$root.find('[name="event_date"]'), 'Event date is required.');
 				}
 				if (this.state.guestCount <= 0) {
-					setInlineError(this.$root.find('input[name="guest_count"]'), 'Guest count must be greater than 0.');
+					setInlineError(this.$root.find('[name="guest_count"]'), 'Guest count must be greater than 0.');
 				}
 				if (!this.state.location) {
-					setInlineError(this.$root.find('input[name="location"]'), 'Location is required.');
+					setInlineError(this.$root.find('[name="location"]'), 'Location is required.');
 				}
 				notify('Please complete all event details.', 'error');
 				return false;

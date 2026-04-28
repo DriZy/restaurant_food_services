@@ -97,6 +97,8 @@ class Public_Module extends Abstract_Module {
 	 * @return void
 	 */
 	public function enqueue_public_assets() {
+		$catering_draft_payload = $this->get_requested_catering_draft_payload();
+
 		wp_enqueue_style(
 			'restaurant-food-services-public',
 			RESTAURANT_FOOD_SERVICES_URL . 'assets/css/public-frontend.css',
@@ -123,6 +125,7 @@ class Public_Module extends Abstract_Module {
 				'cateringDraftNonce'   => wp_create_nonce( 'restaurant_catering_wizard_draft' ),
 				'cateringSubmitNonce'  => wp_create_nonce( 'restaurant_catering_wizard_submit' ),
 				'cateringPriceNonce'   => wp_create_nonce( 'restaurant_catering_price_preview' ),
+				'cateringDraftPayload' => $catering_draft_payload,
 			)
 		);
 
@@ -140,6 +143,57 @@ class Public_Module extends Abstract_Module {
 			array( 'jquery', 'restaurant-food-services-public' ),
 			defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0',
 			true
+		);
+	}
+
+	/**
+	 * Returns saved draft payload requested from account hub.
+	 *
+	 * @return array<string,mixed>
+	 */
+	protected function get_requested_catering_draft_payload() {
+		if ( ! is_user_logged_in() || ! isset( $_GET['restaurant_draft_id'] ) ) {
+			return array();
+		}
+
+		$draft_id = absint( wp_unslash( $_GET['restaurant_draft_id'] ) );
+
+		if ( $draft_id <= 0 ) {
+			return array();
+		}
+
+		$draft = get_post( $draft_id );
+
+		if ( ! $draft || 'catering_request' !== $draft->post_type || (int) $draft->post_author !== get_current_user_id() || 'draft' !== $draft->post_status ) {
+			return array();
+		}
+
+		$raw_payload = get_post_meta( $draft_id, '_restaurant_catering_draft_data', true );
+		$payload     = is_string( $raw_payload ) ? json_decode( $raw_payload, true ) : array();
+
+		if ( ! is_array( $payload ) ) {
+			$payload = array();
+		}
+
+		$menu_quantities = isset( $payload['menu_quantities'] ) && is_array( $payload['menu_quantities'] ) ? $payload['menu_quantities'] : array();
+
+		if ( empty( $menu_quantities ) ) {
+			$menu_meta = get_post_meta( $draft_id, 'menu_items', true );
+			$decoded   = is_string( $menu_meta ) ? json_decode( $menu_meta, true ) : array();
+			$menu_quantities = is_array( $decoded ) ? $decoded : array();
+		}
+
+		return array(
+			'draftId'            => $draft_id,
+			'eventType'          => isset( $payload['event_type'] ) ? sanitize_text_field( $payload['event_type'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'event_type', true ) ),
+			'eventDate'          => isset( $payload['event_date'] ) ? sanitize_text_field( $payload['event_date'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'event_date', true ) ),
+			'guestCount'         => isset( $payload['guest_count'] ) ? absint( $payload['guest_count'] ) : absint( get_post_meta( $draft_id, 'guest_count', true ) ),
+			'location'           => isset( $payload['location'] ) ? sanitize_text_field( $payload['location'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'location', true ) ),
+			'servingStyle'       => isset( $payload['serving_style'] ) ? sanitize_text_field( $payload['serving_style'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'serving_style', true ) ),
+			'customDescription'  => isset( $payload['custom_description'] ) ? sanitize_textarea_field( $payload['custom_description'] ) : sanitize_textarea_field( (string) get_post_meta( $draft_id, 'custom_description', true ) ),
+			'specialRequests'    => isset( $payload['special_requests'] ) ? sanitize_textarea_field( $payload['special_requests'] ) : sanitize_textarea_field( (string) get_post_meta( $draft_id, 'special_requests', true ) ),
+			'dietaryNeeds'       => isset( $payload['dietary_requirements'] ) ? sanitize_textarea_field( $payload['dietary_requirements'] ) : sanitize_textarea_field( (string) get_post_meta( $draft_id, 'dietary_requirements', true ) ),
+			'menuQuantities'     => array_map( 'absint', (array) $menu_quantities ),
 		);
 	}
 
@@ -767,8 +821,14 @@ class Public_Module extends Abstract_Module {
 			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'restaurant-food-services' ) ), 403 );
 		}
 
-		if ( ! function_exists( 'WC' ) || ! WC()->session ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Unable to save draft right now.', 'restaurant-food-services' ) ), 500 );
+		$user_id = get_current_user_id();
+
+		if ( $user_id <= 0 ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Please log in to save a draft.', 'restaurant-food-services' ) ), 401 );
+		}
+
+		if ( ! post_type_exists( 'catering_request' ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Catering drafts are currently unavailable.', 'restaurant-food-services' ) ), 500 );
 		}
 
 		$menu_quantities = isset( $_POST['menu_quantities'] ) ? (array) wp_unslash( $_POST['menu_quantities'] ) : array();
@@ -785,16 +845,54 @@ class Public_Module extends Abstract_Module {
 			'location'         => isset( $_POST['location'] ) ? sanitize_text_field( wp_unslash( $_POST['location'] ) ) : '',
 			'serving_style'    => $serving_style,
 			'menu_quantities'  => array_map( 'absint', $menu_quantities ),
+			'custom_description' => isset( $_POST['custom_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['custom_description'] ) ) : '',
 			'special_requests' => isset( $_POST['special_requests'] ) ? sanitize_textarea_field( wp_unslash( $_POST['special_requests'] ) ) : '',
 			'dietary_requirements' => $dietary_requirements,
 			'dietary_needs'    => $dietary_requirements,
 		);
 
-		WC()->session->set( 'restaurant_catering_wizard_draft', $draft );
+		$draft_id = absint( get_user_meta( $user_id, '_restaurant_catering_draft_id', true ) );
+		$draft_post = array(
+			'post_type'    => 'catering_request',
+			'post_status'  => 'draft',
+			'post_author'  => $user_id,
+			'post_title'   => sprintf(
+				/* translators: %s: human readable draft context. */
+				__( 'Catering Draft - %s', 'restaurant-food-services' ),
+				! empty( $draft['event_type'] ) ? $draft['event_type'] : __( 'New Request', 'restaurant-food-services' )
+			),
+			'post_content' => '',
+		);
+
+		if ( $draft_id > 0 && get_post( $draft_id ) && (int) get_post_field( 'post_author', $draft_id ) === $user_id ) {
+			$draft_post['ID'] = $draft_id;
+			$draft_id         = wp_update_post( $draft_post, true );
+		} else {
+			$draft_id = wp_insert_post( $draft_post, true );
+		}
+
+		if ( is_wp_error( $draft_id ) || ! $draft_id ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Unable to save draft right now.', 'restaurant-food-services' ) ), 500 );
+		}
+
+		$draft_id = absint( $draft_id );
+		update_post_meta( $draft_id, '_restaurant_catering_draft_data', wp_json_encode( $draft ) );
+		update_post_meta( $draft_id, 'event_type', $draft['event_type'] );
+		update_post_meta( $draft_id, 'event_date', $draft['event_date'] );
+		update_post_meta( $draft_id, 'guest_count', $draft['guest_count'] );
+		update_post_meta( $draft_id, 'location', $draft['location'] );
+		update_post_meta( $draft_id, 'serving_style', $draft['serving_style'] );
+		update_post_meta( $draft_id, 'menu_items', wp_json_encode( $draft['menu_quantities'] ) );
+		update_post_meta( $draft_id, 'custom_description', $draft['custom_description'] );
+		update_post_meta( $draft_id, 'special_requests', $draft['special_requests'] );
+		update_post_meta( $draft_id, 'dietary_requirements', $draft['dietary_requirements'] );
+		update_post_meta( $draft_id, 'dietary_needs', $draft['dietary_needs'] );
+		update_user_meta( $user_id, '_restaurant_catering_draft_id', $draft_id );
 
 		wp_send_json_success(
 			array(
 				'message' => esc_html__( 'Draft saved.', 'restaurant-food-services' ),
+				'draft_id' => $draft_id,
 			)
 		);
 	}
@@ -1038,6 +1136,14 @@ class Public_Module extends Abstract_Module {
 		if ( function_exists( 'WC' ) && WC()->session ) {
 			WC()->session->__unset( 'restaurant_catering_wizard_draft' );
 		}
+
+		$draft_id = absint( get_user_meta( $user_id, '_restaurant_catering_draft_id', true ) );
+
+		if ( $draft_id > 0 && get_post( $draft_id ) && (int) get_post_field( 'post_author', $draft_id ) === $user_id ) {
+			wp_trash_post( $draft_id );
+		}
+
+		delete_user_meta( $user_id, '_restaurant_catering_draft_id' );
 
 		do_action( 'restaurant_food_services_catering_request_submitted', (int) $post_id );
 		delete_transient( $submission_lock_key );
@@ -1357,6 +1463,7 @@ class Public_Module extends Abstract_Module {
 		);
 
 		$order->update_meta_data( '_restaurant_meal_plan_selection', wp_json_encode( $selection ) );
+		$order->update_meta_data( '_restaurant_order_type', 'weekly_meal_plan' );
 		$order->update_meta_data( 'selected_meals', wp_json_encode( $valid_products ) );
 		$order->update_meta_data( 'delivery_days', wp_json_encode( array( 'sunday' ) ) );
 		$order->update_meta_data( 'delivery_time_slot', $delivery_time );
@@ -1440,6 +1547,7 @@ class Public_Module extends Abstract_Module {
 		}
 
 		$order->update_meta_data( '_restaurant_meal_plan_selection', wp_json_encode( $selection ) );
+		$order->update_meta_data( '_restaurant_order_type', 'weekly_meal_plan' );
 		$order->update_meta_data( 'selected_meals', wp_json_encode( isset( $selection['selected_meals'] ) ? (array) $selection['selected_meals'] : array() ) );
 		$order->update_meta_data( 'delivery_days', wp_json_encode( array( 'sunday' ) ) );
 		$location_data = isset( $selection['delivery_location_data'] ) && is_array( $selection['delivery_location_data'] ) ? $this->sanitize_location_data( $selection['delivery_location_data'] ) : array(
@@ -1970,6 +2078,8 @@ class Public_Module extends Abstract_Module {
 			'restaurant-order-meals' => 'restaurant_order_meals',
 			'restaurant-meal-plans'  => 'restaurant_meal_plans',
 			'restaurant-catering'    => 'restaurant_catering',
+			'restaurant-account'     => 'restaurant_account',
+			'restaurant-signup'      => 'restaurant_signup',
 		);
 
 		foreach ( $blocks as $block_slug => $shortcode_tag ) {

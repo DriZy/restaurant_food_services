@@ -125,6 +125,51 @@
 		});
 	}
 
+	function initAuthTabSwitchers() {
+		function setActiveTab($switcher, tabName) {
+			var targetTab = (tabName || '').toString();
+			var $tabs = $switcher.find('[data-auth-target]');
+			var $panels = $switcher.find('.restaurant-account-auth__panel');
+
+			if (!targetTab) {
+				targetTab = $tabs.filter('.is-active').data('auth-target') || $tabs.first().data('auth-target') || 'signin';
+			}
+
+			$tabs.each(function () {
+				var $tab = $(this);
+				var isActive = ($tab.data('auth-target') || '').toString() === targetTab;
+				$tab.toggleClass('is-active', isActive);
+				$tab.attr('aria-selected', isActive ? 'true' : 'false');
+			});
+
+			$panels.each(function () {
+				var $panel = $(this);
+				var isActivePanel = ($panel.data('auth-panel') || '').toString() === targetTab;
+				if (isActivePanel) {
+					$panel.removeAttr('hidden');
+				} else {
+					$panel.attr('hidden', 'hidden');
+				}
+			});
+		}
+
+		$(document).on('click', '[data-auth-switcher] [data-auth-target]', function () {
+			var $tab = $(this);
+			var $switcher = $tab.closest('[data-auth-switcher]');
+
+			if (!$switcher.length) {
+				return;
+			}
+
+			setActiveTab($switcher, $tab.data('auth-target'));
+		});
+
+		$('[data-auth-switcher]').each(function () {
+			var $switcher = $(this);
+			setActiveTab($switcher, $switcher.data('auth-default-tab'));
+		});
+	}
+
 	window.RestaurantFoodServicesUI = window.RestaurantFoodServicesUI || {};
 	window.RestaurantFoodServicesUI.showToast = showToast;
 	window.RestaurantFoodServicesUI.updateCartCount = updateCartCount;
@@ -132,6 +177,7 @@
 
 	initCollapsibleFilters();
 	initMobileStickyCta();
+	initAuthTabSwitchers();
 
 	$(document).on('click', '.restaurant-ajax-add-to-cart', function (event) {
 		event.preventDefault();

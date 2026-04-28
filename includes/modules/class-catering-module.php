@@ -1527,6 +1527,7 @@ class Catering_Module extends Abstract_Module {
 		$location   = get_post_meta( $catering_id, 'location', true );
 
 		$order->update_meta_data( '_catering_request_id', $catering_id );
+		$order->update_meta_data( '_restaurant_order_type', 'catering' );
 		$order->update_meta_data( 'catering_event_date', $event_date );
 		$order->update_meta_data( 'catering_location', $location );
 

@@ -6,6 +6,7 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 
 - **Meals module**: add meal-plan product settings like meals per week, meal selection rules, and meal metadata.
 - **Frontend entry pages**: shortcode-based public containers for `[restaurant_order_meals]`, `[restaurant_meal_plans]`, and `[restaurant_catering]`.
+- **Account authentication UI**: a signup-first `Sign up / Sign in` tab switcher for the frontend account page and registration shortcode.
 - **Subscriptions module**: create subscription records from checkout orders, support customer pause/resume/cancel actions, and process renewal scheduling.
 - **Catering module**: capture catering requests via shortcode form, manage requests in admin, and convert approved requests into WooCommerce orders.
 - **Delivery module**: collect delivery date/time-slot checkout fields and manage delivery schedules from the admin dashboard.
@@ -23,6 +24,7 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 - `includes/modules/class-module-interface.php` - Module contract.
 - `includes/modules/class-abstract-module.php` - Shared module base class.
 - `includes/modules/class-public-module.php` - Frontend shortcodes module hooks.
+- `includes/modules/class-account-module.php` - Frontend account hub, signup/login switcher, and account endpoint rendering.
 - `includes/modules/class-meals-module.php` - Meals module hooks.
 - `includes/modules/class-subscriptions-module.php` - Subscriptions module hooks.
 - `includes/modules/class-catering-module.php` - Catering module hooks.
@@ -33,6 +35,28 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 - `includes/public/class-catering-page.php` - `[restaurant_catering]` renderer.
 - `scripts/integration-smoke-check.sh` - Loader and registration smoke checks.
 - `index.php` - Direct access protection.
+
+## Frontend Account Authentication
+
+The account module adds a signup-first authentication experience for logged-out users:
+
+- `[restaurant_signup]` renders a registration-first page with a secondary **Sign in** tab.
+- `[restaurant_account]` renders the same logged-out auth switcher, then shows the Restaurant Hub when the visitor is signed in.
+- The WooCommerce my-account endpoint also uses the same logged-out switcher when registration is enabled.
+
+### Behavior
+
+- **Sign up** is the default tab so new customers can register immediately.
+- **Sign in** remains available as the secondary tab for returning customers.
+- If WooCommerce registration is disabled, the UI falls back to the login form only.
+- The switcher respects WooCommerce settings such as `woocommerce_enable_myaccount_registration`, `woocommerce_registration_generate_username`, and `woocommerce_registration_generate_password`.
+
+### Optional tab links
+
+You can deep-link to a specific tab with the `auth` query parameter:
+
+- `?auth=signup` opens the Sign up tab.
+- `?auth=signin` opens the Sign in tab.
 
 ## Loader Architecture
 
@@ -66,6 +90,11 @@ Manual flow checks in wp-admin/storefront:
    - Verify `catering_request` post is created with pending status.
    - Approve via admin status change or Convert to Order.
    - Verify "Catering Request Submitted" and "Catering Approved" emails trigger once.
+
+4. Account auth flow
+   - Visit a page containing `[restaurant_signup]` or `[restaurant_account]` while logged out.
+   - Confirm **Sign up** is shown first and **Sign in** can be switched to instantly.
+   - Disable WooCommerce registration to confirm the UI falls back to the sign-in form only.
 
 ## Notes
 

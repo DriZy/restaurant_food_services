@@ -8,6 +8,7 @@
 namespace Restaurant\FoodServices;
 
 use Restaurant\FoodServices\Modules\Catering_Module;
+use Restaurant\FoodServices\Modules\Account_Module;
 use Restaurant\FoodServices\Modules\Delivery_Module;
 use Restaurant\FoodServices\Modules\Emails_Module;
 use Restaurant\FoodServices\Modules\Meals_Module;
@@ -138,6 +139,7 @@ class Plugin {
 	protected function load_modules() {
 		return array(
 			new Public_Module(),
+			new Account_Module(),
 			new Emails_Module(),
 			new Meals_Module(),
 			new Subscriptions_Module(),

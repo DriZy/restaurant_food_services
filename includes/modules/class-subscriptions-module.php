@@ -106,6 +106,8 @@ class Subscriptions_Module extends Abstract_Module {
 				continue;
 			}
 
+			$order->update_meta_data( '_restaurant_order_type', 'weekly_meal_plan' );
+
 			$meals_per_week = (int) get_post_meta( $product_id, 'meals_per_week', true );
 
 			if ( $meals_per_week <= 0 ) {
@@ -335,6 +337,7 @@ class Subscriptions_Module extends Abstract_Module {
 		}
 
 		$order->update_meta_data( 'delivery_date', $this->normalize_to_sunday_date( (string) $subscription->next_order_date ) );
+		$order->update_meta_data( '_restaurant_order_type', 'weekly_meal_plan' );
 		$order->update_meta_data( 'delivery_days', wp_json_encode( $delivery_days ) );
 		$order->update_meta_data( 'delivery_location_data', wp_json_encode( $location_data ) );
 		if ( isset( $location_data['formatted_address'] ) ) {

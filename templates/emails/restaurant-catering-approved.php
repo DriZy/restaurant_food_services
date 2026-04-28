@@ -79,6 +79,37 @@ do_action( 'woocommerce_email_header', $email_heading, $email );
 </p>
 
 <?php
+// Generate URLs for action buttons.
+$my_account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/my-account/' );
+$catering_requests_url = add_query_arg( 'catering_request', isset( $catering->catering_id ) ? $catering->catering_id : 0, trailingslashit( $my_account_url ) . 'my-catering-requests' );
+?>
+
+<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+	<p style="margin-bottom: 15px;">
+		<strong><?php esc_html_e( 'Next Steps:', 'restaurant-food-services' ); ?></strong>
+	</p>
+	<table cellspacing="0" cellpadding="0" border="0" style="width: 100%; margin-bottom: 20px;">
+		<tr>
+			<td style="padding-right: 10px; padding-bottom: 10px;">
+				<a href="<?php echo esc_url( $catering_requests_url ); ?>" style="display: inline-block; padding: 12px 24px; background-color: #2ea44f; color: #fff; text-decoration: none; border-radius: 3px; font-weight: 600;">
+					<?php esc_html_e( '💰 Complete Order & Checkout', 'restaurant-food-services' ); ?>
+				</a>
+			</td>
+		</tr>
+		<tr>
+			<td style="padding-top: 10px;">
+				<a href="<?php echo esc_url( $catering_requests_url ); ?>" style="display: inline-block; padding: 12px 24px; background-color: #0073aa; color: #fff; text-decoration: none; border-radius: 3px; font-weight: 600;">
+					<?php esc_html_e( '💬 Send a Message', 'restaurant-food-services' ); ?>
+				</a>
+			</td>
+		</tr>
+	</table>
+	<p style="font-size: 12px; color: #666; margin: 10px 0 0 0;">
+		<?php esc_html_e( 'Use the buttons above to proceed with payment or send a message directly to the store owner from your account.', 'restaurant-food-services' ); ?>
+	</p>
+</div>
+
+<?php
 do_action( 'woocommerce_email_footer', $email );
 ?>
 

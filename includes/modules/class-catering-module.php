@@ -1645,6 +1645,294 @@ class Catering_Module extends Abstract_Module {
 	}
 
 	/**
+	 * Returns the URL to view a catering request with chat on the frontend.
+	 *
+	 * @param int $catering_id Catering request post ID.
+	 *
+	 * @return string
+	 */
+	public function get_catering_request_url( $catering_id ) {
+		$catering_id = absint( $catering_id );
+
+		if ( $catering_id <= 0 ) {
+			return '';
+		}
+
+		$post = get_post( $catering_id );
+
+		if ( ! $post || 'catering_request' !== $post->post_type ) {
+			return '';
+		}
+
+		$my_account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/my-account/' );
+
+		if ( ! $my_account_url ) {
+			return '';
+		}
+
+		return add_query_arg( 'catering_request', $catering_id, trailingslashit( $my_account_url ) . 'my-catering-requests' );
+	}
+
+	/**
+	 * Renders a detailed catering request view with chat.
+	 *
+	 * @param int $catering_id Catering request post ID.
+	 *
+	 * @return void
+	 */
+	public function render_catering_request_detail( $catering_id ) {
+		$catering_id = absint( $catering_id );
+
+		if ( ! $catering_id ) {
+			echo '<p>' . esc_html__( 'Invalid catering request.', 'restaurant-food-services' ) . '</p>';
+			return;
+		}
+
+		$post = get_post( $catering_id );
+
+		if ( ! $post || 'catering_request' !== $post->post_type ) {
+			echo '<p>' . esc_html__( 'Catering request not found.', 'restaurant-food-services' ) . '</p>';
+			return;
+		}
+
+		if ( ! $this->user_can_access_catering_chat( $catering_id ) ) {
+			echo '<p>' . esc_html__( 'You do not have access to this request.', 'restaurant-food-services' ) . '</p>';
+			return;
+		}
+
+		$event_type           = sanitize_text_field( (string) get_post_meta( $catering_id, 'event_type', true ) );
+		$event_date           = sanitize_text_field( (string) get_post_meta( $catering_id, 'event_date', true ) );
+		$guest_count          = absint( get_post_meta( $catering_id, 'guest_count', true ) );
+		$location             = sanitize_text_field( (string) get_post_meta( $catering_id, 'location', true ) );
+		$serving_style        = sanitize_text_field( (string) get_post_meta( $catering_id, 'serving_style', true ) );
+		$dietary_requirements = sanitize_textarea_field( (string) get_post_meta( $catering_id, 'dietary_requirements', true ) );
+		$special_requests     = sanitize_textarea_field( (string) get_post_meta( $catering_id, 'special_requests', true ) );
+		$custom_description   = sanitize_textarea_field( (string) get_post_meta( $catering_id, 'custom_description', true ) );
+		$total_price          = (float) get_post_meta( $catering_id, 'total_price', true );
+		$menu_items_json      = (string) get_post_meta( $catering_id, 'menu_items', true );
+		$menu_items           = $this->decode_json_array( $menu_items_json );
+		$status               = get_post_meta( $catering_id, 'catering_status', true );
+		$checkout_url         = '';
+
+		if ( empty( $status ) ) {
+			$status = 'pending';
+		}
+
+		if ( 'approved' === $status ) {
+			$checkout_url = $this->get_catering_checkout_url( $catering_id );
+		}
+
+		$status_label = $this->get_catering_status_label( $status );
+		?>
+		<div class="restaurant-catering-request-detail">
+			<h2><?php esc_html_e( 'Catering Request', 'restaurant-food-services' ); ?> #<?php echo esc_html( $catering_id ); ?></h2>
+
+			<div class="restaurant-catering-request-status-bar">
+				<strong><?php esc_html_e( 'Status:', 'restaurant-food-services' ); ?></strong>
+				<span class="restaurant-catering-status <?php echo esc_attr( 'status-' . sanitize_key( $status ) ); ?>"><?php echo esc_html( $status_label ); ?></span>
+			</div>
+
+			<div class="restaurant-catering-request-grid">
+				<section class="restaurant-catering-request-details">
+					<h3><?php esc_html_e( 'Request Details', 'restaurant-food-services' ); ?></h3>
+					<table class="restaurant-catering-details-table">
+						<tbody>
+							<?php if ( $event_type ) : ?>
+								<tr>
+									<td class="label"><?php esc_html_e( 'Event Type', 'restaurant-food-services' ); ?></td>
+									<td><?php echo esc_html( $event_type ); ?></td>
+								</tr>
+							<?php endif; ?>
+							<tr>
+								<td class="label"><?php esc_html_e( 'Event Date', 'restaurant-food-services' ); ?></td>
+								<td><?php echo esc_html( $event_date ); ?></td>
+							</tr>
+							<tr>
+								<td class="label"><?php esc_html_e( 'Location', 'restaurant-food-services' ); ?></td>
+								<td><?php echo esc_html( $location ); ?></td>
+							</tr>
+							<tr>
+								<td class="label"><?php esc_html_e( 'Number of Guests', 'restaurant-food-services' ); ?></td>
+								<td><?php echo esc_html( $guest_count ); ?></td>
+							</tr>
+							<?php if ( $serving_style ) : ?>
+								<tr>
+									<td class="label"><?php esc_html_e( 'Service Style', 'restaurant-food-services' ); ?></td>
+									<td><?php echo esc_html( $serving_style ); ?></td>
+								</tr>
+							<?php endif; ?>
+							<tr>
+								<td class="label"><?php esc_html_e( 'Estimated Total', 'restaurant-food-services' ); ?></td>
+								<td><strong><?php echo wp_kses_post( wc_price( $total_price ) ); ?></strong></td>
+							</tr>
+						</tbody>
+					</table>
+
+					<?php if ( ! empty( $dietary_requirements ) ) : ?>
+						<div class="restaurant-catering-detail-section">
+							<h4><?php esc_html_e( 'Dietary Requirements', 'restaurant-food-services' ); ?></h4>
+							<p><?php echo wp_kses_post( nl2br( esc_html( $dietary_requirements ) ) ); ?></p>
+						</div>
+					<?php endif; ?>
+
+					<?php if ( ! empty( $special_requests ) ) : ?>
+						<div class="restaurant-catering-detail-section">
+							<h4><?php esc_html_e( 'Special Requests', 'restaurant-food-services' ); ?></h4>
+							<p><?php echo wp_kses_post( nl2br( esc_html( $special_requests ) ) ); ?></p>
+						</div>
+					<?php endif; ?>
+
+					<?php if ( ! empty( $custom_description ) ) : ?>
+						<div class="restaurant-catering-detail-section">
+							<h4><?php esc_html_e( 'Custom Meal Description', 'restaurant-food-services' ); ?></h4>
+							<p><?php echo wp_kses_post( nl2br( esc_html( $custom_description ) ) ); ?></p>
+						</div>
+					<?php endif; ?>
+
+					<?php if ( ! empty( $menu_items ) ) : ?>
+						<div class="restaurant-catering-detail-section">
+							<h4><?php esc_html_e( 'Menu Items', 'restaurant-food-services' ); ?></h4>
+							<table class="restaurant-catering-items-table">
+								<thead>
+									<tr>
+										<th><?php esc_html_e( 'Item', 'restaurant-food-services' ); ?></th>
+										<th><?php esc_html_e( 'Qty', 'restaurant-food-services' ); ?></th>
+										<th><?php esc_html_e( 'Price', 'restaurant-food-services' ); ?></th>
+										<th><?php esc_html_e( 'Subtotal', 'restaurant-food-services' ); ?></th>
+									</tr>
+								</thead>
+								<tbody>
+									<?php foreach ( $menu_items as $item ) : ?>
+										<?php
+										$product_name = isset( $item['product_name'] ) ? sanitize_text_field( $item['product_name'] ) : '';
+										$quantity     = isset( $item['quantity'] ) ? intval( $item['quantity'] ) : 1;
+										$price        = isset( $item['price'] ) ? floatval( $item['price'] ) : 0;
+										$subtotal     = $price * $quantity;
+										?>
+										<tr>
+											<td><?php echo esc_html( $product_name ); ?></td>
+											<td><?php echo esc_html( $quantity ); ?></td>
+											<td><?php echo wp_kses_post( wc_price( $price ) ); ?></td>
+											<td><strong><?php echo wp_kses_post( wc_price( $subtotal ) ); ?></strong></td>
+										</tr>
+									<?php endforeach; ?>
+								</tbody>
+							</table>
+						</div>
+					<?php endif; ?>
+
+					<?php if ( $checkout_url ) : ?>
+						<div class="restaurant-catering-actions">
+							<a href="<?php echo esc_url( $checkout_url ); ?>" class="button button-primary" style="display:inline-block; margin-top:15px;">
+								<?php esc_html_e( 'Proceed to Checkout', 'restaurant-food-services' ); ?>
+							</a>
+						</div>
+					<?php endif; ?>
+				</section>
+
+				<section class="restaurant-catering-request-chat">
+					<?php $this->render_catering_chat_panel( $catering_id, 'frontend' ); ?>
+				</section>
+			</div>
+
+			<style>
+				.restaurant-catering-request-detail {
+					background: #fff;
+					padding: 20px;
+				}
+				.restaurant-catering-request-status-bar {
+					margin-bottom: 20px;
+					padding: 12px 15px;
+					background: #f5f5f5;
+					border-radius: 4px;
+					display: flex;
+					gap: 10px;
+					align-items: center;
+				}
+				.restaurant-catering-status {
+					display: inline-block;
+					padding: 4px 12px;
+					border-radius: 3px;
+					font-weight: 600;
+					font-size: 12px;
+					text-transform: uppercase;
+				}
+				.restaurant-catering-status.status-pending {
+					background: #fff3cd;
+					color: #856404;
+				}
+				.restaurant-catering-status.status-approved {
+					background: #d4edda;
+					color: #155724;
+				}
+				.restaurant-catering-status.status-rejected {
+					background: #f8d7da;
+					color: #721c24;
+				}
+				.restaurant-catering-request-grid {
+					display: grid;
+					grid-template-columns: 1fr 1fr;
+					gap: 30px;
+					margin-top: 20px;
+				}
+				@media (max-width: 768px) {
+					.restaurant-catering-request-grid {
+						grid-template-columns: 1fr;
+					}
+				}
+				.restaurant-catering-request-details h3,
+				.restaurant-catering-request-chat h3 {
+					margin-top: 0;
+					border-bottom: 2px solid #f5f5f5;
+					padding-bottom: 10px;
+				}
+				.restaurant-catering-details-table {
+					width: 100%;
+					border-collapse: collapse;
+					margin-bottom: 20px;
+				}
+				.restaurant-catering-details-table tr {
+					border-bottom: 1px solid #e5e5e5;
+				}
+				.restaurant-catering-details-table td {
+					padding: 10px 0;
+				}
+				.restaurant-catering-details-table td.label {
+					font-weight: 600;
+					color: #666;
+					width: 160px;
+				}
+				.restaurant-catering-detail-section {
+					margin-top: 20px;
+					padding-top: 20px;
+					border-top: 1px solid #e5e5e5;
+				}
+				.restaurant-catering-detail-section h4 {
+					margin-top: 0;
+					margin-bottom: 10px;
+				}
+				.restaurant-catering-items-table {
+					width: 100%;
+					border-collapse: collapse;
+				}
+				.restaurant-catering-items-table thead {
+					background: #f5f5f5;
+				}
+				.restaurant-catering-items-table th,
+				.restaurant-catering-items-table td {
+					padding: 10px;
+					text-align: left;
+					border-bottom: 1px solid #e5e5e5;
+				}
+				.restaurant-catering-items-table th {
+					font-weight: 600;
+				}
+			</style>
+		</div>
+		<?php
+	}
+
+	/**
 	 * Registers the "My Catering Requests" endpoint for WooCommerce My Account.
 	 *
 	 * @return void
@@ -1678,6 +1966,19 @@ class Catering_Module extends Abstract_Module {
 			return;
 		}
 
+		// Check if viewing a specific catering request detail.
+		$catering_request_id = isset( $_GET['catering_request'] ) ? absint( $_GET['catering_request'] ) : 0;
+
+		if ( $catering_request_id > 0 ) {
+			$catering_post = get_post( $catering_request_id );
+
+			if ( $catering_post && 'catering_request' === $catering_post->post_type && $user_id === (int) $catering_post->post_author ) {
+				echo '<p><a href="' . esc_url( remove_query_arg( 'catering_request' ) ) . '" class="button">&larr; ' . esc_html__( 'Back to Requests', 'restaurant-food-services' ) . '</a></p>';
+				$this->render_catering_request_detail( $catering_request_id );
+				return;
+			}
+		}
+
 		$args = array(
 			'post_type'      => 'catering_request',
 			'posts_per_page' => -1,
@@ -1701,7 +2002,7 @@ class Catering_Module extends Abstract_Module {
 						<th><?php esc_html_e( 'Date', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Guests', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Status', 'restaurant-food-services' ); ?></th>
-						<th><?php esc_html_e( 'Action', 'restaurant-food-services' ); ?></th>
+						<th><?php esc_html_e( 'Actions', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Submitted', 'restaurant-food-services' ); ?></th>
 					</tr>
 				</thead>
@@ -1722,6 +2023,7 @@ class Catering_Module extends Abstract_Module {
 						}
 
 						$status_label = $this->get_catering_status_label( $status );
+						$detail_url = $this->get_catering_request_url( (int) $request->ID );
 						?>
 						<tr>
 							<td><?php echo esc_html( $location ); ?></td>
@@ -1729,18 +2031,12 @@ class Catering_Module extends Abstract_Module {
 							<td><?php echo esc_html( $guest_count ); ?></td>
 							<td><span class="catering-status"><?php echo esc_html( $status_label ); ?></span></td>
 							<td>
+								<a href="<?php echo esc_url( $detail_url ); ?>" class="button" style="margin-right: 5px;"><?php esc_html_e( 'View Details', 'restaurant-food-services' ); ?></a>
 								<?php if ( '' !== $checkout_url ) : ?>
-									<a class="button" href="<?php echo esc_url( $checkout_url ); ?>"><?php esc_html_e( 'Proceed to Checkout', 'restaurant-food-services' ); ?></a>
-								<?php else : ?>
-									<span>&mdash;</span>
+									<a class="button button-primary" href="<?php echo esc_url( $checkout_url ); ?>"><?php esc_html_e( 'Checkout', 'restaurant-food-services' ); ?></a>
 								<?php endif; ?>
 							</td>
 							<td><?php echo esc_html( $request->post_date ); ?></td>
-						</tr>
-						<tr>
-							<td colspan="6">
-								<?php $this->render_catering_chat_panel( (int) $request->ID, 'frontend' ); ?>
-							</td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

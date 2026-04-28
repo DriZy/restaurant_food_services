@@ -36,6 +36,10 @@
 		return $('<div />').text((value || '').toString()).html();
 	}
 
+	function formatMultilineHtml(value) {
+		return escapeHtml(value || '').replace(/\n/g, '<br />');
+	}
+
 	function CateringWizard($root) {
 		this.$root = $root;
 		this.currentStep = 1;
@@ -271,19 +275,29 @@
 
 		var self = this;
 		var items = [];
+		var detailsHtml = '';
+		var isCustomOffering = this.isCustomOffering();
+		var customDescription = (this.state.customDescription || '').trim();
 
-		Object.keys(this.state.menuQuantities).forEach(function (key) {
-			var qty = parseInt(self.state.menuQuantities[key], 10) || 0;
-			if (qty <= 0) {
-				return;
-			}
-			var $input = self.$root.find('.restaurant-menu-quantity[data-product-id="' + key + '"]');
-			var name = ($input.data('product-name') || ('Item #' + key)).toString();
-			items.push({ name: name, quantity: qty });
-		});
+		if (isCustomOffering && customDescription) {
+			detailsHtml = '<strong>Custom Design</strong><div class="restaurant-summary-sidebar__details-text">' + formatMultilineHtml(customDescription) + '</div>';
+		}
+
+		if (!isCustomOffering) {
+			Object.keys(this.state.menuQuantities).forEach(function (key) {
+				var qty = parseInt(self.state.menuQuantities[key], 10) || 0;
+				if (qty <= 0) {
+					return;
+				}
+				var $input = self.$root.find('.restaurant-menu-quantity[data-product-id="' + key + '"]');
+				var name = ($input.data('product-name') || ('Item #' + key)).toString();
+				items.push({ name: name, quantity: qty });
+			});
+		}
 
 		this.summarySidebar.update({
 			items: items,
+			detailsHtml: detailsHtml,
 			totalHtml: this.state.pricing.totalHtml || '$0.00'
 		});
 	};
@@ -387,24 +401,34 @@
 		var itemCount = 0;
 		var qtyTotal = 0;
 		var mealCards = '';
-		Object.keys(this.state.menuQuantities).forEach(function (key) {
-			itemCount += 1;
-			var qty = parseInt(self.state.menuQuantities[key], 10) || 0;
-			qtyTotal += qty;
-			if (qty > 0) {
-				var $input = self.$root.find('.restaurant-menu-quantity[data-product-id="' + key + '"]');
-				var name = ($input.data('product-name') || ('Item #' + key)).toString();
-				mealCards += '<article class="restaurant-selected-meal-card">';
-				mealCards += '<h6 class="restaurant-selected-meal-card__title">' + escapeHtml(name) + '</h6>';
-				mealCards += '<strong class="restaurant-selected-meal-card__price">Qty: ' + qty + '</strong>';
-				mealCards += '</article>';
-			}
-		}, this);
+		var customDescription = (this.state.customDescription || '').trim();
+		var isCustomOffering = this.isCustomOffering();
+		var customSummary = '';
 
-		if (mealCards) {
-			mealCards = '<div class="restaurant-selected-meals-cards">' + mealCards + '</div>';
-		} else {
-			mealCards = '<p>-</p>';
+		if (isCustomOffering && customDescription) {
+			customSummary = '<article class="restaurant-summary-item restaurant-summary-item--full-width"><strong>Custom Design</strong><span class="restaurant-summary-text">' + formatMultilineHtml(customDescription) + '</span></article>';
+		}
+
+		if (!isCustomOffering) {
+			Object.keys(this.state.menuQuantities).forEach(function (key) {
+				itemCount += 1;
+				var qty = parseInt(self.state.menuQuantities[key], 10) || 0;
+				qtyTotal += qty;
+				if (qty > 0) {
+					var $input = self.$root.find('.restaurant-menu-quantity[data-product-id="' + key + '"]');
+					var name = ($input.data('product-name') || ('Item #' + key)).toString();
+					mealCards += '<article class="restaurant-selected-meal-card">';
+					mealCards += '<h6 class="restaurant-selected-meal-card__title">' + escapeHtml(name) + '</h6>';
+					mealCards += '<strong class="restaurant-selected-meal-card__price">Qty: ' + qty + '</strong>';
+					mealCards += '</article>';
+				}
+			}, this);
+
+			if (mealCards) {
+				mealCards = '<div class="restaurant-selected-meals-cards">' + mealCards + '</div>';
+			} else {
+				mealCards = '<p>-</p>';
+			}
 		}
 
 		var html = '';
@@ -416,9 +440,18 @@
 		html += '<article class="restaurant-summary-item"><strong>Guest Count</strong><span>' + escapeHtml((this.state.guestCount || '-').toString()) + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Location</strong><span>' + escapeHtml(this.state.location || '-') + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Service Option</strong><span>' + escapeHtml(this.state.servingStyle || '-') + '</span></article>';
-		html += '<article class="restaurant-summary-item"><strong>Menu Items</strong><span>' + escapeHtml((itemCount + ' items (' + qtyTotal + ' qty)').toString()) + '</span></article>';
+		if (isCustomOffering) {
+			html += '<article class="restaurant-summary-item"><strong>Offer Type</strong><span>Custom Design</span></article>';
+			html += '<article class="restaurant-summary-item"><strong>Design Notes</strong><span>' + escapeHtml(customDescription || '-') .replace(/\n/g, '<br />') + '</span></article>';
+		} else {
+			html += '<article class="restaurant-summary-item"><strong>Menu Items</strong><span>' + escapeHtml((itemCount + ' items (' + qtyTotal + ' qty)').toString()) + '</span></article>';
+		}
 		html += '</div>';
-		html += '<div class="restaurant-selected-meals-summary"><h5>Selected Meals</h5>' + mealCards + '</div>';
+		if (isCustomOffering) {
+			html += '<div class="restaurant-selected-meals-summary"><h5>Custom Design</h5>' + (customSummary || '<p>-</p>') + '</div>';
+		} else {
+			html += '<div class="restaurant-selected-meals-summary"><h5>Selected Meals</h5>' + mealCards + '</div>';
+		}
 		html += '<div class="restaurant-summary-grid">';
 		html += '<article class="restaurant-summary-item"><strong>Special Requests</strong><span>' + escapeHtml(this.state.specialRequests || '-') + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Dietary Needs</strong><span>' + escapeHtml(this.state.dietaryNeeds || '-') + '</span></article>';

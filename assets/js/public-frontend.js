@@ -44,11 +44,21 @@
 	SummarySidebar.prototype.update = function (payload) {
 		var items = (payload && payload.items) ? payload.items : [];
 		var totalHtml = (payload && payload.totalHtml) ? payload.totalHtml : '$0.00';
+		var detailsHtml = (payload && payload.detailsHtml) ? payload.detailsHtml : '';
 
 		this.$items.empty();
 
+		if (detailsHtml) {
+			this.$items.append($('<li/>', {
+				class: 'restaurant-summary-sidebar__details',
+				html: detailsHtml
+			}));
+		}
+
 		if (!items.length) {
-			this.$items.append($('<li/>', { text: 'No selections yet.' }));
+			if (!detailsHtml) {
+				this.$items.append($('<li/>', { text: 'No selections yet.' }));
+			}
 		} else {
 			items.forEach(function (item) {
 				var label = (item.name || 'Item') + ' x ' + (item.quantity || 1);

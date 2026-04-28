@@ -1,10 +1,11 @@
 <?php
 /**
  * Plugin Name: Restaurant Food Services
- * Plugin URI: https://example.com/
+ * Plugin URI: https://github.com/DriZy/restaurant_food_services/
  * Description: A production-ready WordPress plugin scaffold for Restaurant Food Services Plugin.
  * Version: 1.0.0
  * Author: Tabi Idris
+ * Author URI: https://github.com/DriZy/
  * Requires at least: 5.8
  * Requires PHP: 7.2
  * Text Domain: restaurant-food-services

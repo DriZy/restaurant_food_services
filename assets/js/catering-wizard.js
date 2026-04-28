@@ -624,7 +624,7 @@
 			.done(function (response) {
 				if (response && response.success) {
 					var message = (response.data && response.data.message) ? response.data.message : 'Catering request submitted successfully.';
-					self.showSubmissionStatus(message, 'success');
+					self.showSubmissionStatus(message, 'success', 3000);
 					notify(message, 'success');
 					if (response.data && response.data.request_id) {
 						self.$root.attr('data-request-id', response.data.request_id);

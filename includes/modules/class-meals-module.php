@@ -191,7 +191,11 @@ class Meals_Module extends Abstract_Module {
 			return;
 		}
 
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		// Only allow administrators or the product post author to save meal plan meta
+		$current_user = get_current_user_id();
+		$post_author  = (int) get_post_field( 'post_author', $post_id );
+
+		if ( ! current_user_can( 'manage_options' ) && $current_user !== $post_author ) {
 			return;
 		}
 

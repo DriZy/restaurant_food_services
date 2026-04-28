@@ -46,6 +46,8 @@ class Catering_Module extends Abstract_Module {
 		$loader->add_action( 'woocommerce_account_my-catering-requests_endpoint', $this, 'render_my_catering_requests_page' );
 		$loader->add_action( 'admin_menu', $this, 'register_catering_admin_menu' );
 		$loader->add_action( 'admin_enqueue_scripts', $this, 'enqueue_catering_admin_assets' );
+		// Restrict edit UI for non-authors on post edit screens
+		$loader->add_action( 'admin_head-post.php', $this, 'maybe_restrict_catering_admin_edit_ui' );
 		$loader->add_action( 'wp_enqueue_scripts', $this, 'enqueue_catering_frontend_assets' );
 		$loader->add_action( 'wp_ajax_restaurant_catering_settings_option_action', $this, 'handle_catering_settings_option_action' );
 		$loader->add_action( 'wp_ajax_restaurant_catering_send_message', $this, 'handle_catering_send_message_ajax' );
@@ -222,7 +224,13 @@ class Catering_Module extends Abstract_Module {
 	public function enqueue_catering_admin_assets( $hook_suffix ) {
 		$current_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 
-		if ( 'restaurant-catering-settings' !== $current_page && false === strpos( (string) $hook_suffix, 'restaurant-catering-settings' ) ) {
+		// Enqueue assets for catering settings page OR when editing a catering_request post
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		$is_settings_page = ( 'restaurant-catering-settings' === $current_page ) || ( false !== strpos( (string) $hook_suffix, 'restaurant-catering-settings' ) );
+
+		if ( ! $is_settings_page && ( ! $screen || 'catering_request' !== $screen->post_type || ! in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) ) {
+			// Not catering settings and not editing a catering_request post
 			return;
 		}
 
@@ -263,6 +271,77 @@ class Catering_Module extends Abstract_Module {
 				'confirmDelete' => esc_html__( 'Delete this option?', 'restaurant-food-services' ),
 			)
 		);
+
+		// If we're on a catering_request edit screen, also enqueue the chat AJAX script and localize
+		if ( $screen && 'catering_request' === $screen->post_type && in_array( $hook_suffix, array( 'post.php', 'post-new.php' ), true ) ) {
+			$script_path    = dirname( dirname( __DIR__ ) ) . '/assets/js/catering-chat-ajax.js';
+			$script_version = defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0';
+
+			if ( file_exists( $script_path ) ) {
+				$script_version = (string) filemtime( $script_path );
+			}
+
+			wp_enqueue_script(
+				'restaurant-food-services-catering-chat-ajax',
+				RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-chat-ajax.js',
+				array(),
+				$script_version,
+				true
+			);
+
+			wp_localize_script(
+				'restaurant-food-services-catering-chat-ajax',
+				'RestaurantFoodServicesCateringChat',
+				array(
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'restaurant_catering_chat_nonce' ),
+				)
+			);
+		}
+	}
+
+	/**
+	 * Prevents non-author users from editing catering_request posts in admin UI.
+	 * This adds client-side disabling of inputs and replaces update actions with a notice.
+	 *
+	 * @return void
+	 */
+	public function maybe_restrict_catering_admin_edit_ui() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+
+		if ( ! $screen || 'catering_request' !== $screen->post_type ) {
+			return;
+		}
+
+		$post_id = isset( $_GET['post'] ) ? absint( wp_unslash( $_GET['post'] ) ) : 0;
+
+		if ( $post_id <= 0 ) {
+			return;
+		}
+
+		$current_user = get_current_user_id();
+		$post_author  = (int) get_post_field( 'post_author', $post_id );
+
+		// If current user is admin or post author, no restriction needed.
+		if ( current_user_can( 'manage_options' ) || $current_user === $post_author ) {
+			return;
+		}
+
+		// Print inline script/CSS to disable editing controls and show an informational notice.
+		echo '<style>#poststuff input, #poststuff textarea, #poststuff select, #postbutton, #publish { pointer-events: none; opacity: 0.6; }</style>';
+
+		$notice_text = esc_html__( 'You are viewing this catering request in read-only mode. Only the request owner or site administrators can make changes here.', 'restaurant-food-services' );
+		$notice_html = '<p>' . esc_html( $notice_text ) . '</p>';
+		// Encode for safe embedding into JS
+		$notice_json = wp_json_encode( $notice_html );
+
+		echo '<script>document.addEventListener("DOMContentLoaded", function(){';
+		echo 'var notice = document.createElement("div");';
+		echo 'notice.className = "notice notice-warning inline";';
+		echo 'notice.style.marginBottom = "12px";';
+		echo 'notice.innerHTML = ' . $notice_json . ';';
+		echo 'var wrap = document.querySelector(".wrap"); if (wrap) wrap.parentNode.insertBefore(notice, wrap);';
+		echo '});</script>';
 	}
 
 	/**
@@ -1138,6 +1217,11 @@ class Catering_Module extends Abstract_Module {
 	public function render_menu_items_meta_box( $post ) {
 		wp_nonce_field( 'catering_request_nonce', 'catering_request_nonce_field' );
 
+		// If current user is not admin and not post author, render the meta box in read-only mode (disable inputs)
+		$current_user = get_current_user_id();
+		$post_author  = (int) get_post_field( 'post_author', $post->ID );
+		$readonly_mode = ( ! current_user_can( 'manage_options' ) && $current_user !== $post_author );
+
 		$menu_items_json = get_post_meta( $post->ID, 'menu_items', true );
 		$menu_items      = $this->decode_json_array( $menu_items_json );
 
@@ -1167,7 +1251,8 @@ class Catering_Module extends Abstract_Module {
 			echo '<tr>';
 			echo '<td>' . esc_html( $product_name ) . '</td>';
 			echo '<td>$' . number_format( $price, 2 ) . '</td>';
-			echo '<td><input type="number" name="menu_item_quantities[' . esc_attr( $index ) . ']" value="' . esc_attr( $quantity ) . '" min="1" style="width: 100px;"></td>';
+			$input_attr = $readonly_mode ? ' disabled' : '';
+			echo '<td><input type="number" name="menu_item_quantities[' . esc_attr( $index ) . ']" value="' . esc_attr( $quantity ) . '" min="1" style="width: 100px;"' . $input_attr . '></td>';
 			echo '<td class="subtotal-cell">$' . number_format( $subtotal, 2 ) . '</td>';
 			echo '</tr>';
 		}
@@ -1210,11 +1295,15 @@ class Catering_Module extends Abstract_Module {
 			$total_price = $this->calculate_menu_items_total( $menu_items );
 		}
 
+		$current_user = get_current_user_id();
+		$post_author  = (int) get_post_field( 'post_author', $post->ID );
+		$readonly_mode = ( ! current_user_can( 'manage_options' ) && $current_user !== $post_author );
+
 		?>
 		<div class="catering-pricing-box">
 			<p>
 				<label for="total_price"><?php esc_html_e( 'Total Price', 'restaurant-food-services' ); ?>:</label><br>
-				<input type="number" id="total_price" name="total_price" value="<?php echo esc_attr( number_format( $total_price, 2 ) ); ?>" step="0.01" min="0" style="width: 100%; padding: 5px; font-size: 16px; font-weight: bold;">
+							<input type="number" id="total_price" name="total_price" value="<?php echo esc_attr( number_format( $total_price, 2 ) ); ?>" step="0.01" min="0" style="width: 100%; padding: 5px; font-size: 16px; font-weight: bold;" <?php echo $readonly_mode ? 'disabled' : ''; ?> >
 			</p>
 
 			<?php if ( $converted_order_id ) : ?>
@@ -1227,7 +1316,7 @@ class Catering_Module extends Abstract_Module {
 			<?php else : ?>
 				<p>
 					<?php $convert_url = wp_nonce_url( add_query_arg( array( 'action' => 'restaurant_convert_to_order', 'catering_id' => $post->ID ), admin_url( 'edit.php' ) ), 'catering_convert_nonce' ); ?>
-					<a href="<?php echo esc_url( $convert_url ); ?>" class="button button-primary" style="width: 100%; box-sizing: border-box;">
+											<a href="<?php echo esc_url( $convert_url ); ?>" class="button button-primary" style="width: 100%; box-sizing: border-box;" <?php echo $readonly_mode ? 'aria-disabled="true" onclick="return false;"' : ''; ?>>
 									<?php esc_html_e( 'Convert to WooCommerce Order', 'restaurant-food-services' ); ?>
 					</a>
 				</p>
@@ -1253,7 +1342,11 @@ class Catering_Module extends Abstract_Module {
 	 * @return void
 	 */
 	public function save_catering_request_meta( $post_id ) {
-		if ( ! current_user_can( 'manage_options' ) ) {
+		// Allow only administrators or the original post author to save changes
+		$current_user = get_current_user_id();
+		$post_author  = (int) get_post_field( 'post_author', $post_id );
+
+		if ( ! current_user_can( 'manage_options' ) && $current_user !== $post_author ) {
 			return;
 		}
 

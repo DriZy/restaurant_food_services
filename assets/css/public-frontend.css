@@ -854,6 +854,21 @@
 	width: auto;
 }
 
+.restaurant-account-auth__switch-note {
+	margin: 0.75rem 0 0.25rem;
+	font-size: 0.95rem;
+	color: #666;
+}
+
+.restaurant-account-auth__switch-action {
+	margin: 0;
+}
+
+.restaurant-account-auth__switch-button {
+	width: 100%;
+	justify-content: center;
+}
+
 .restaurant-account-quick-actions {
 	margin: 1.5rem 0;
 	padding: 1rem;

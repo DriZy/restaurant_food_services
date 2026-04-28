@@ -507,7 +507,7 @@ class Account_Module extends Abstract_Module {
 					<?php endif; ?>
 
 					<div class="restaurant-account-auth__panel" data-auth-panel="signin" id="restaurant-auth-signin-panel" role="tabpanel" aria-labelledby="restaurant-auth-signin-tab"<?php echo 'signin' === $default_tab ? '' : ' hidden'; ?>>
-						<?php echo $this->render_signin_form(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php echo $this->render_signin_form( $registration_enabled ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</div>
 			</section>
 		</div>
@@ -546,7 +546,7 @@ class Account_Module extends Abstract_Module {
 	 *
 	 * @return string
 	 */
-	protected function render_signin_form() {
+	protected function render_signin_form( $allow_signup_switch = true ) {
 		ob_start();
 		?>
 		<form class="woocommerce-form woocommerce-form-login login" method="post">
@@ -574,6 +574,17 @@ class Account_Module extends Abstract_Module {
 			<p class="woocommerce-LostPassword lost_password">
 				<a href="<?php echo esc_url( function_exists( 'wc_lostpassword_url' ) ? wc_lostpassword_url() : wp_lostpassword_url() ); ?>"><?php esc_html_e( 'Lost your password?', 'woocommerce' ); ?></a>
 			</p>
+
+			<?php if ( $allow_signup_switch ) : ?>
+				<p class="restaurant-account-auth__switch-note">
+					<?php esc_html_e( 'Need a new account?', 'restaurant-food-services' ); ?>
+				</p>
+				<p class="form-row restaurant-account-auth__switch-action">
+					<button type="button" class="woocommerce-button button button-secondary restaurant-account-auth__switch-button" data-auth-target="signup">
+						<?php esc_html_e( 'Register / Sign up instead', 'restaurant-food-services' ); ?>
+					</button>
+				</p>
+			<?php endif; ?>
 
 			<?php do_action( 'woocommerce_login_form_end' ); ?>
 		</form>
@@ -779,6 +790,25 @@ class Account_Module extends Abstract_Module {
 		<?php
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Gets active catering requests for the current user.
+	 *
+	 * @param int $user_id User ID.
+	 *
+	 * @return array<int,\WP_Post>
+	 */
+	protected function get_active_catering_requests( $user_id ) {
+		$args = array(
+			'post_type'      => 'catering_request',
+			'posts_per_page' => -1,
+			'author'         => absint( $user_id ),
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		);
+
+		return get_posts( $args );
 	}
 
 	/**

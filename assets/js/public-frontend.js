@@ -142,7 +142,7 @@
 			var $panels = $switcher.find('.restaurant-account-auth__panel');
 
 			if (!targetTab) {
-				targetTab = $tabs.filter('.is-active').data('auth-target') || $tabs.first().data('auth-target') || 'signin';
+				targetTab = $tabs.filter('.is-active').data('auth-target') || $tabs.first().data('auth-target') || 'signup';
 			}
 
 			$tabs.each(function () {

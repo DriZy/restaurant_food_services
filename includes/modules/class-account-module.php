@@ -110,6 +110,29 @@ class Account_Module extends Abstract_Module {
 		</section>
 		<?php
 
+		// Additional improved styling for the My Account hub
+		echo '<style>
+		.restaurant-account-hub{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:26px;padding:18px}
+		.restaurant-account-hero{display:flex;justify-content:space-between;align-items:center;gap:20px;background:linear-gradient(180deg,#fff 0%,#fbfbfd 100%);padding:22px;border-radius:8px;box-shadow:0 6px 20px rgba(34,41,47,0.04)}
+		.restaurant-account-hero__eyebrow{color:#8a8f98;font-weight:600}
+		.restaurant-account-hero h2{margin:0;font-size:22px}
+		.restaurant-account-hero__actions{display:flex;gap:10px}
+		.restaurant-account-overview-grid{display:grid;grid-template-columns:1fr 360px;gap:24px}
+		@media (max-width:900px){.restaurant-account-overview-grid{grid-template-columns:1fr}}
+		.restaurant-account-card{background:#fff;border-radius:8px;padding:18px;border:1px solid #eef0f3}
+		.restaurant-account-profile-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+		.restaurant-account-profile-list li{display:flex;justify-content:space-between;gap:10px}
+		.restaurant-account-stats{display:flex;gap:12px;flex-wrap:wrap}
+		.restaurant-account-stat{background:#f7f9fb;padding:10px 12px;border-radius:6px;text-align:center;min-width:96px}
+		.restaurant-account-drafts-card .restaurant-account-draft-list{display:flex;flex-direction:column;gap:12px}
+		.restaurant-catering-requests-list .restaurant-catering-request-item{display:flex;justify-content:space-between;align-items:flex-start}
+		.restaurant-account-orders-card table{width:100%;border-collapse:collapse}
+		.woocommerce-MyAccount-orders th,.woocommerce-MyAccount-orders td{padding:12px;border-bottom:1px solid #f1f3f5}
+		.restaurant-account-quick-actions .restaurant-quick-action-button{display:inline-flex;align-items:center;gap:12px;padding:12px 16px;border-radius:8px;background:#fff;border:1px solid #eef0f3;text-decoration:none;color:inherit}
+		.restaurant-account-quick-actions .restaurant-quick-action-icon{font-size:20px}
+		.woocommerce-message{border-left:4px solid #2c7be5;background:#f1f7ff;padding:12px 16px;border-radius:6px}
+		</style>';
+
 		return (string) ob_get_clean();
 	}
 
@@ -162,6 +185,11 @@ class Account_Module extends Abstract_Module {
 	 * @return array<string,string>
 	 */
 	public function add_account_menu_item( $items ) {
+		// Remove the default "downloads" menu item if present (user requested)
+		if ( isset( $items['downloads'] ) ) {
+			unset( $items['downloads'] );
+		}
+
 		$menu_items = array();
 
 		foreach ( $items as $key => $label ) {
@@ -1088,5 +1116,54 @@ class Account_Module extends Abstract_Module {
 			wc_get_account_endpoint_url( $this->endpoint )
 		);
 	}
-}
 
+	/**
+	 * Renders orders table for a grouped order category.
+	 *
+	 * @param array<int,\WC_Order> $orders Orders list.
+	 * @param string $empty_message Message to show when no orders.
+	 *
+	 * @return string
+	 */
+	protected function render_orders_table( $orders, $empty_message = '' ) {
+		if ( empty( $orders ) ) {
+			return '<p>' . esc_html( $empty_message ?: __( 'No orders found.', 'restaurant-food-services' ) ) . '</p>';
+		}
+
+		ob_start();
+		?>
+		<table class="woocommerce-orders-table woocommerce-MyAccount-orders">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Order', 'woocommerce' ); ?></th>
+					<th><?php esc_html_e( 'Date', 'woocommerce' ); ?></th>
+					<th><?php esc_html_e( 'Status', 'woocommerce' ); ?></th>
+					<th><?php esc_html_e( 'Total', 'woocommerce' ); ?></th>
+					<th><?php esc_html_e( 'Actions', 'woocommerce' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $orders as $order ) : ?>
+					<?php
+					$order_id = $order->get_id();
+					$order_number = $order->get_order_number();
+					$order_date = wc_format_datetime( $order->get_date_created() );
+					$order_status = $order->get_status();
+					$order_total = $order->get_formatted_order_total();
+					$order_url = $order->get_view_order_url();
+					?>
+					<tr>
+						<td><a href="<?php echo esc_url( $order_url ); ?>"><?php echo esc_html( sprintf( _x( '#%s', 'hash before order number', 'woocommerce' ), $order_number ) ); ?></a></td>
+						<td><?php echo esc_html( $order_date ); ?></td>
+						<td><mark class="order-status status-<?php echo esc_attr( $order_status ); ?>"><span><?php echo esc_html( wc_get_order_status_name( $order_status ) ); ?></span></mark></td>
+						<td><?php echo wp_kses_post( $order_total ); ?></td>
+						<td><a href="<?php echo esc_url( $order_url ); ?>" class="button button-small"><?php esc_html_e( 'View', 'woocommerce' ); ?></a></td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
+		<?php
+
+		return (string) ob_get_clean();
+	}
+}

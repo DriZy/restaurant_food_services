@@ -46,7 +46,10 @@ class Catering_Module extends Abstract_Module {
 		$loader->add_action( 'woocommerce_account_my-catering-requests_endpoint', $this, 'render_my_catering_requests_page' );
 		$loader->add_action( 'admin_menu', $this, 'register_catering_admin_menu' );
 		$loader->add_action( 'admin_enqueue_scripts', $this, 'enqueue_catering_admin_assets' );
+		$loader->add_action( 'wp_enqueue_scripts', $this, 'enqueue_catering_frontend_assets' );
 		$loader->add_action( 'wp_ajax_restaurant_catering_settings_option_action', $this, 'handle_catering_settings_option_action' );
+		$loader->add_action( 'wp_ajax_restaurant_catering_send_message', $this, 'handle_catering_send_message_ajax' );
+		$loader->add_action( 'wp_ajax_nopriv_restaurant_catering_send_message', $this, 'handle_catering_send_message_ajax' );
 		$loader->add_action( 'restaurant_food_services_catering_request_submitted', $this, 'ensure_catering_request_comments_enabled' );
 		$loader->add_filter( 'preprocess_comment', $this, 'enforce_catering_chat_comment_permissions' );
 	}
@@ -258,6 +261,37 @@ class Catering_Module extends Abstract_Module {
 				'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
 				'errorMessage'  => esc_html__( 'Request failed. Please refresh and try again.', 'restaurant-food-services' ),
 				'confirmDelete' => esc_html__( 'Delete this option?', 'restaurant-food-services' ),
+			)
+		);
+	}
+
+	/**
+	 * Enqueues frontend assets for catering chat AJAX.
+	 *
+	 * @return void
+	 */
+	public function enqueue_catering_frontend_assets() {
+		$script_path    = dirname( dirname( __DIR__ ) ) . '/assets/js/catering-chat-ajax.js';
+		$script_version = defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0';
+
+		if ( file_exists( $script_path ) ) {
+			$script_version = (string) filemtime( $script_path );
+		}
+
+		wp_enqueue_script(
+			'restaurant-food-services-catering-chat-ajax',
+			RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-chat-ajax.js',
+			array(),
+			$script_version,
+			true
+		);
+
+		wp_localize_script(
+			'restaurant-food-services-catering-chat-ajax',
+			'RestaurantFoodServicesCateringChat',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'restaurant_catering_chat_nonce' ),
 			)
 		);
 	}
@@ -2239,5 +2273,87 @@ class Catering_Module extends Abstract_Module {
 			}
 		})();
 		</script>';
+	}
+
+	/**
+	 * Handles AJAX message submission for catering chat.
+	 *
+	 * @return void
+	 */
+	public function handle_catering_send_message_ajax() {
+		// Verify nonce
+		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'restaurant_catering_chat_nonce' ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		// Get catering request ID and message content
+		$catering_id = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+		$message     = isset( $_POST['message'] ) ? sanitize_textarea_field( wp_unslash( $_POST['message'] ) ) : '';
+
+		// Validate inputs
+		if ( $catering_id <= 0 ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Invalid catering request.', 'restaurant-food-services' ) ), 400 );
+		}
+
+		if ( empty( $message ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Message cannot be empty.', 'restaurant-food-services' ) ), 400 );
+		}
+
+		// Check permissions
+		if ( ! $this->user_can_access_catering_chat( $catering_id ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'You do not have permission to send messages on this request.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'You must be logged in to send messages.', 'restaurant-food-services' ) ), 401 );
+		}
+
+		// Create the comment
+		$comment_data = array(
+			'comment_post_ID'      => $catering_id,
+			'comment_content'      => $message,
+			'comment_type'         => 'catering_chat',
+			'user_id'              => get_current_user_id(),
+			'comment_approved'     => 1,
+		);
+
+		$comment_id = wp_insert_comment( $comment_data );
+
+		if ( ! $comment_id ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Failed to send message.', 'restaurant-food-services' ) ), 500 );
+		}
+
+		// Get the newly created comment
+		$comment = get_comment( $comment_id );
+
+		if ( ! $comment ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Failed to retrieve comment.', 'restaurant-food-services' ) ), 500 );
+		}
+
+		// Build the comment HTML for frontend display
+		$author_label = get_comment_author( $comment );
+		$timestamp    = mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $comment->comment_date, true );
+		$author_class = 'restaurant-catering-chat-message--user';
+
+		if ( (int) $comment->user_id === (int) get_post_field( 'post_author', $catering_id ) ) {
+			$author_class = 'restaurant-catering-chat-message--owner';
+		} elseif ( $comment->user_id > 0 && user_can( (int) $comment->user_id, 'manage_options' ) ) {
+			$author_class = 'restaurant-catering-chat-message--admin';
+		}
+
+		$comment_html = '<article class="restaurant-catering-chat-message ' . esc_attr( $author_class ) . '">';
+		$comment_html .= '<header><strong>' . esc_html( $author_label ) . '</strong> <span>' . esc_html( $timestamp ) . '</span></header>';
+		$comment_html .= '<div class="restaurant-catering-chat-message__body">' . wp_kses_post( wpautop( $comment->comment_content ) ) . '</div>';
+		$comment_html .= '</article>';
+
+		// Return success with the new comment HTML
+		wp_send_json_success(
+			array(
+				'message'      => esc_html__( 'Message sent successfully.', 'restaurant-food-services' ),
+				'commentHtml'  => $comment_html,
+				'commentId'    => $comment_id,
+			)
+		);
 	}
 }

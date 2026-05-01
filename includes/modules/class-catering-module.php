@@ -2278,6 +2278,7 @@ class Catering_Module extends Abstract_Module {
 			array(
 				'post_id' => $post_id,
 				'status'  => 'approve',
+				'type'    => 'catering_chat',
 				'orderby' => 'comment_date_gmt',
 				'order'   => 'ASC',
 			)

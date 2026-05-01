@@ -94,6 +94,20 @@ Manual flow checks in wp-admin/storefront:
 4. Account auth flow
    - Visit a page containing `[restaurant_signup]` or `[restaurant_account]` while logged out.
    - Confirm **Sign up** is shown first and **Sign in** can be switched to instantly.
+   - Try to access `your-site.com/wp-login.php` as a guest; confirm you are redirected to the page with `[restaurant_signup]`.
+   - Use `[restaurant_login_logout]` in a widget or menu and verify it toggles correctly between Log In/Log Out.
+   - Disable WooCommerce registration to confirm the UI falls back to the sign-in form only.
+
+## Notes
+
+This scaffold is ready for additional restaurant and food service features, admin screens, API integrations, and custom post types.
+
+
+ - Verify "Catering Request Submitted" and "Catering Approved" emails trigger once.
+
+4. Account auth flow
+   - Visit a page containing `[restaurant_signup]` or `[restaurant_account]` while logged out.
+   - Confirm **Sign up** is shown first and **Sign in** can be switched to instantly.
    - Disable WooCommerce registration to confirm the UI falls back to the sign-in form only.
 
 ## Notes

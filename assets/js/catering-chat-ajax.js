@@ -60,11 +60,17 @@
 		}
 
 		// Show loading state
-		const submitButton = form.querySelector('button[type="submit"]');
-		const originalButtonText = submitButton ? submitButton.textContent : 'Send Message';
+		const submitButton = form.querySelector('input[type="submit"], button[type="submit"]');
+		let originalButtonText = 'Send Message';
+		
 		if (submitButton) {
+			originalButtonText = submitButton.tagName === 'INPUT' ? submitButton.value : submitButton.textContent;
 			submitButton.disabled = true;
-			submitButton.textContent = 'Sending...';
+			if (submitButton.tagName === 'INPUT') {
+				submitButton.value = 'Sending...';
+			} else {
+				submitButton.textContent = 'Sending...';
+			}
 		}
 
 		// Send AJAX request
@@ -72,7 +78,11 @@
 			// Restore button state
 			if (submitButton) {
 				submitButton.disabled = false;
-				submitButton.textContent = originalButtonText;
+				if (submitButton.tagName === 'INPUT') {
+					submitButton.value = originalButtonText;
+				} else {
+					submitButton.textContent = originalButtonText;
+				}
 			}
 
 			if (success) {
@@ -273,13 +283,6 @@
 	} else {
 		addNotificationStyles();
 		initCateringChatAjax();
-	}
-
-	// Reinitialize on dynamic content loading (for admin post editor)
-	if (typeof window.wp !== 'undefined' && typeof window.wp.hooks !== 'undefined') {
-		window.wp.hooks.addAction('metabox.post.catering_chat_thread', 'restaurantFoodServices', function() {
-			initCateringChatAjax();
-		});
 	}
 
 })();

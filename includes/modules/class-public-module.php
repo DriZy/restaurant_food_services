@@ -189,6 +189,8 @@ class Public_Module extends Abstract_Module {
 			'eventDate'          => isset( $payload['event_date'] ) ? sanitize_text_field( $payload['event_date'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'event_date', true ) ),
 			'guestCount'         => isset( $payload['guest_count'] ) ? absint( $payload['guest_count'] ) : absint( get_post_meta( $draft_id, 'guest_count', true ) ),
 			'location'           => isset( $payload['location'] ) ? sanitize_text_field( $payload['location'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'location', true ) ),
+			'locationLatitude'   => isset( $payload['location_latitude'] ) ? sanitize_text_field( $payload['location_latitude'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'location_latitude', true ) ),
+			'locationLongitude'  => isset( $payload['location_longitude'] ) ? sanitize_text_field( $payload['location_longitude'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'location_longitude', true ) ),
 			'servingStyle'       => isset( $payload['serving_style'] ) ? sanitize_text_field( $payload['serving_style'] ) : sanitize_text_field( (string) get_post_meta( $draft_id, 'serving_style', true ) ),
 			'customDescription'  => isset( $payload['custom_description'] ) ? sanitize_textarea_field( $payload['custom_description'] ) : sanitize_textarea_field( (string) get_post_meta( $draft_id, 'custom_description', true ) ),
 			'specialRequests'    => isset( $payload['special_requests'] ) ? sanitize_textarea_field( $payload['special_requests'] ) : sanitize_textarea_field( (string) get_post_meta( $draft_id, 'special_requests', true ) ),
@@ -229,7 +231,12 @@ class Public_Module extends Abstract_Module {
 		echo '</select></p>';
 		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Event Date', 'restaurant-food-services' ) . '</label><input type="date" class="restaurant-wizard-input input-text" name="event_date" min="' . esc_attr( $min_event_date ) . '" /></p>';
 		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Guest Count', 'restaurant-food-services' ) . '</label><input type="number" min="1" class="restaurant-wizard-input input-text" name="guest_count" /></p>';
-		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Location', 'restaurant-food-services' ) . '</label><input type="text" class="restaurant-wizard-input input-text" name="location" /></p>';
+		echo '<p class="form-row form-row-wide restaurant-location-field"><label>' . esc_html__( 'Location', 'restaurant-food-services' ) . '</label>';
+		echo '<input type="text" class="restaurant-wizard-input input-text" name="location" autocomplete="off" required />';
+		echo '<input type="hidden" name="location_latitude" value="" />';
+		echo '<input type="hidden" name="location_longitude" value="" />';
+		echo '<div class="restaurant-location-suggestions" hidden></div>';
+		echo '</p>';
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="2">';
@@ -429,7 +436,7 @@ class Public_Module extends Abstract_Module {
 		echo '<div class="restaurant-location-suggestions" hidden></div>';
 		echo '</p>';
 		echo '<div class="restaurant-delivery-days">';
-		foreach ( array( 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' ) as $day ) {
+		foreach ( array( 'sunday' ) as $day ) {
 			echo '<label><input type="checkbox" class="restaurant-delivery-day" value="' . esc_attr( $day ) . '"> ' . esc_html( ucfirst( $day ) ) . '</label>';
 		}
 		echo '</div>';
@@ -843,6 +850,8 @@ class Public_Module extends Abstract_Module {
 			'event_date'       => isset( $_POST['event_date'] ) ? sanitize_text_field( wp_unslash( $_POST['event_date'] ) ) : '',
 			'guest_count'      => isset( $_POST['guest_count'] ) ? absint( wp_unslash( $_POST['guest_count'] ) ) : 0,
 			'location'         => isset( $_POST['location'] ) ? sanitize_text_field( wp_unslash( $_POST['location'] ) ) : '',
+			'location_latitude' => isset( $_POST['location_latitude'] ) ? sanitize_text_field( wp_unslash( $_POST['location_latitude'] ) ) : '',
+			'location_longitude' => isset( $_POST['location_longitude'] ) ? sanitize_text_field( wp_unslash( $_POST['location_longitude'] ) ) : '',
 			'serving_style'    => $serving_style,
 			'menu_quantities'  => array_map( 'absint', $menu_quantities ),
 			'custom_description' => isset( $_POST['custom_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['custom_description'] ) ) : '',
@@ -952,6 +961,8 @@ class Public_Module extends Abstract_Module {
 		$event_date  = isset( $_POST['event_date'] ) ? sanitize_text_field( wp_unslash( $_POST['event_date'] ) ) : '';
 		$guest_count = isset( $_POST['guest_count'] ) ? absint( wp_unslash( $_POST['guest_count'] ) ) : 0;
 		$location    = isset( $_POST['location'] ) ? sanitize_text_field( wp_unslash( $_POST['location'] ) ) : '';
+		$location_latitude = isset( $_POST['location_latitude'] ) ? sanitize_text_field( wp_unslash( $_POST['location_latitude'] ) ) : '';
+		$location_longitude = isset( $_POST['location_longitude'] ) ? sanitize_text_field( wp_unslash( $_POST['location_longitude'] ) ) : '';
 		$serving_style = isset( $_POST['serving_style'] ) ? sanitize_text_field( wp_unslash( $_POST['serving_style'] ) ) : '';
 		$menu_quantities = isset( $_POST['menu_quantities'] ) ? (array) wp_unslash( $_POST['menu_quantities'] ) : array();
 		$custom_description = isset( $_POST['custom_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['custom_description'] ) ) : '';
@@ -1011,6 +1022,8 @@ class Public_Module extends Abstract_Module {
 					'event_date'            => $event_date,
 					'guest_count'           => $guest_count,
 					'location'              => $location,
+					'location_latitude'     => $location_latitude,
+					'location_longitude'    => $location_longitude,
 					'serving_style'         => $serving_style,
 					'menu_items'            => $structured_items,
 					'custom_description'    => $custom_description,
@@ -1085,6 +1098,8 @@ class Public_Module extends Abstract_Module {
 		update_post_meta( $post_id, 'event_date', $event_date );
 		update_post_meta( $post_id, 'guest_count', $guest_count );
 		update_post_meta( $post_id, 'location', $location );
+		update_post_meta( $post_id, 'location_latitude', $location_latitude );
+		update_post_meta( $post_id, 'location_longitude', $location_longitude );
 		update_post_meta(
 			$post_id,
 			'event_details',
@@ -1094,6 +1109,8 @@ class Public_Module extends Abstract_Module {
 					'event_date'  => $event_date,
 					'guest_count' => $guest_count,
 					'location'    => $location,
+					'location_latitude' => $location_latitude,
+					'location_longitude' => $location_longitude,
 				)
 			)
 		);

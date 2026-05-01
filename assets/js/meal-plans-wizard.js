@@ -76,8 +76,42 @@
 			this.summarySidebar = new SummarySidebar(this.$sidebar);
 		}
 
+		this.reset();
 		this.bindEvents();
 		this.syncUI();
+		this.updateSidebar();
+
+		var self = this;
+		$(window).on('pageshow', function (event) {
+			if (event.originalEvent.persisted) {
+				self.reset();
+				self.syncUI();
+			}
+		});
+	};
+
+	MealPlansWizard.prototype.reset = function () {
+		this.currentStep = 1;
+		this.state = {
+			planType: '',
+			mealsPerWeek: 0,
+			selectedMeals: [],
+			deliveryLocation: {
+				formattedAddress: '',
+				latitude: '',
+				longitude: ''
+			},
+			deliveryDays: [],
+			deliveryTime: 'morning'
+		};
+
+		this.$root.find('input[type="radio"], input[type="checkbox"]').prop('checked', false);
+		this.$root.find('input[type="text"], input[type="number"], input[type="hidden"], textarea').val('');
+		this.$root.find('select').val('');
+		this.$root.find('.restaurant-meal-plan-quantity').val(0);
+		this.$root.find('.restaurant-field-error').remove();
+		this.$root.find('.has-error').removeClass('has-error');
+
 		this.updateSidebar();
 	};
 
@@ -456,9 +490,15 @@
 						setCartCount(response.data.cart_count);
 					}
 					notify((response.data && response.data.message) ? response.data.message : 'Meal plan saved.', 'success');
-								if (response.data && response.data.checkout_url) {
-									window.location.href = response.data.checkout_url;
-								}
+					
+					var checkoutUrl = response.data && response.data.checkout_url;
+					
+					self.reset();
+					self.syncUI();
+
+					if (checkoutUrl) {
+						window.location.href = checkoutUrl;
+					}
 					return;
 				}
 

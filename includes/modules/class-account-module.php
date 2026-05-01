@@ -51,11 +51,78 @@ class Account_Module extends Abstract_Module {
 		$loader->add_action( 'init', $this, 'register_account_endpoint' );
 		$loader->add_action( 'init', $this, 'register_account_shortcode' );
 		$loader->add_action( 'init', $this, 'handle_draft_delete_action' );
+		$loader->add_action( 'init', $this, 'block_wp_login' );
 		$loader->add_filter( 'woocommerce_account_menu_items', $this, 'add_account_menu_item' );
 		$loader->add_action( 'woocommerce_account_' . $this->endpoint . '_endpoint', $this, 'render_account_endpoint' );
 		$loader->add_action( 'woocommerce_before_customer_login_form', $this, 'render_login_intro' );
 		$loader->add_filter( 'woocommerce_login_redirect', $this, 'redirect_to_restaurant_hub_after_login' );
 		$loader->add_filter( 'woocommerce_logout_redirect', $this, 'redirect_to_signup_after_logout' );
+		$loader->add_filter( 'login_url', $this, 'filter_login_url', 10, 3 );
+		$loader->add_filter( 'logout_url', $this, 'filter_logout_url', 10, 2 );
+	}
+
+	/**
+	 * Filters the login URL to point to the custom signup page.
+	 *
+	 * @param string $login_url    The original login URL.
+	 * @param string $redirect     The redirect destination.
+	 * @param bool   $force_reauth Whether to force reauthentication.
+	 *
+	 * @return string
+	 */
+	public function filter_login_url( $login_url, $redirect = '', $force_reauth = false ) {
+		$signup_page_id = $this->get_signup_page_id();
+		if ( $signup_page_id > 0 ) {
+			$url = get_permalink( $signup_page_id );
+			if ( ! empty( $redirect ) ) {
+				$url = add_query_arg( 'redirect_to', urlencode( $redirect ), $url );
+			}
+			return $url;
+		}
+		return $login_url;
+	}
+
+	/**
+	 * Filters the logout URL to point to the custom signup page.
+	 *
+	 * @param string $logout_url The original logout URL.
+	 * @param string $redirect   The redirect destination.
+	 *
+	 * @return string
+	 */
+	public function filter_logout_url( $logout_url, $redirect = '' ) {
+		if ( ! empty( $redirect ) ) {
+			return $logout_url;
+		}
+
+		$signup_page_id = $this->get_signup_page_id();
+		if ( $signup_page_id > 0 ) {
+			return add_query_arg( 'redirect_to', urlencode( get_permalink( $signup_page_id ) ), $logout_url );
+		}
+
+		return $logout_url;
+	}
+
+	/**
+	 * Blocks access to wp-login.php and redirects to custom login page.
+	 *
+	 * @return void
+	 */
+	public function block_wp_login() {
+		global $pagenow;
+
+		if ( 'wp-login.php' === $pagenow && 'GET' === $_SERVER['REQUEST_METHOD'] && ! isset( $_REQUEST['action'] ) && ! isset( $_REQUEST['interim-login'] ) ) {
+			if ( is_user_logged_in() ) {
+				wp_safe_redirect( $this->redirect_to_restaurant_hub_after_login() );
+				exit;
+			}
+
+			$signup_page_id = $this->get_signup_page_id();
+			if ( $signup_page_id > 0 ) {
+				wp_safe_redirect( get_permalink( $signup_page_id ) );
+				exit;
+			}
+		}
 	}
 
 	/**
@@ -76,6 +143,40 @@ class Account_Module extends Abstract_Module {
 		add_shortcode( $this->shortcode, array( $this, 'render_account_shortcode' ) );
 		add_shortcode( 'restaurant_account', array( $this, 'render_account_shortcode' ) );
 		add_shortcode( 'restaurant_signup', array( $this, 'render_signup_shortcode' ) );
+		add_shortcode( 'restaurant_login_logout', array( $this, 'render_login_logout_shortcode' ) );
+	}
+
+	/**
+	 * Renders a login/logout button.
+	 *
+	 * @param array<string,mixed> $atts Shortcode attributes.
+	 *
+	 * @return string
+	 */
+	public function render_login_logout_shortcode( $atts = array() ) {
+		$atts = shortcode_atts(
+			array(
+				'class' => 'button',
+			),
+			(array) $atts,
+			'restaurant_login_logout'
+		);
+
+		if ( is_user_logged_in() ) {
+			$url   = $this->get_logout_url();
+			$label = __( 'Log Out', 'restaurant-food-services' );
+		} else {
+			$signup_page_id = $this->get_signup_page_id();
+			$url            = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : wp_login_url();
+			$label          = __( 'Log In', 'restaurant-food-services' );
+		}
+
+		return sprintf(
+			'<a href="%s" class="%s">%s</a>',
+			esc_url( $url ),
+			esc_attr( $atts['class'] ),
+			esc_html( $label )
+		);
 	}
 
 	/**
@@ -96,8 +197,16 @@ class Account_Module extends Abstract_Module {
 
 		if ( is_user_logged_in() ) {
 			$account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
+			$logout_url  = $this->get_logout_url();
 
-			return '<div class="woocommerce"><div class="woocommerce-message"><p>' . esc_html__( 'You are already signed in.', 'restaurant-food-services' ) . '</p><p><a class="button" href="' . esc_url( $account_url ) . '">' . esc_html__( 'Go to My Account', 'restaurant-food-services' ) . '</a></p></div></div>';
+			return sprintf(
+				'<div class="woocommerce"><div class="woocommerce-message"><p>%s</p><p><a class="button" href="%s">%s</a> <a class="button button-secondary" href="%s">%s</a></p></div></div>',
+				esc_html__( 'You are already signed in.', 'restaurant-food-services' ),
+				esc_url( $account_url ),
+				esc_html__( 'Go to My Account', 'restaurant-food-services' ),
+				esc_url( $logout_url ),
+				esc_html__( 'Log Out', 'restaurant-food-services' )
+			);
 		}
 
 		ob_start();

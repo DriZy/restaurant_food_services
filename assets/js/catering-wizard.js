@@ -75,8 +75,14 @@
 		this.$submissionStatus = this.$root.find('.restaurant-wizard-submission-status');
 		this.$submissionMessage = this.$root.find('.restaurant-wizard-submission-message');
 		this.$sidebar = this.$root.find('[data-summary-sidebar="catering"]');
+		this.$locationInput = this.$root.find('input[name="location"]');
+		this.$locationLatitude = this.$root.find('input[name="location_latitude"]');
+		this.$locationLongitude = this.$root.find('input[name="location_longitude"]');
+		this.$locationSuggestions = this.$root.find('.restaurant-location-suggestions');
 		this.summarySidebar = null;
 		this.priceRequestTimer = null;
+		this.locationSearchTimer = null;
+		this.locationRequest = null;
 	}
 
 	CateringWizard.prototype.init = function () {
@@ -87,12 +93,56 @@
 			this.summarySidebar = new SummarySidebar(this.$sidebar);
 		}
 
+		this.reset();
 		this.bindEvents();
 		this.hydrateFromDraft();
 		this.syncUI();
 		this.toggleCustomOfferingSection();
 		this.updatePricePreview();
 		this.updateSidebar();
+
+		var self = this;
+		$(window).on('pageshow', function (event) {
+			if (event.originalEvent.persisted) {
+				self.reset();
+				self.syncUI();
+			}
+		});
+	};
+
+	CateringWizard.prototype.reset = function () {
+		this.currentStep = 1;
+		this.state = {
+			eventType: '',
+			eventDate: '',
+			guestCount: 0,
+			location: '',
+			locationLatitude: '',
+			locationLongitude: '',
+			servingStyle: '',
+			menuQuantities: {},
+			customDescription: '',
+			specialRequests: '',
+			dietaryNeeds: '',
+			pricing: {
+				subtotal: 0,
+				serviceFeePercent: 0,
+				serviceFeeAmount: 0,
+				total: 0,
+				subtotalHtml: '$0.00',
+				serviceFeeHtml: '$0.00',
+				totalHtml: '$0.00'
+			}
+		};
+
+		this.$root.find('input[type="text"], input[type="date"], input[type="number"], input[type="hidden"], textarea').val('');
+		this.$root.find('select').val('');
+		this.$root.find('.restaurant-menu-quantity').val(0);
+		this.$root.find('.restaurant-field-error').remove();
+		this.$root.find('.has-error').removeClass('has-error');
+
+		this.updateSidebar();
+		this.updatePricePreview();
 	};
 
 	CateringWizard.prototype.hydrateFromDraft = function () {
@@ -107,6 +157,8 @@
 		this.state.eventDate = (payload.eventDate || '').toString();
 		this.state.guestCount = parseInt(payload.guestCount, 10) || 0;
 		this.state.location = (payload.location || '').toString();
+		this.state.locationLatitude = (payload.locationLatitude || '').toString();
+		this.state.locationLongitude = (payload.locationLongitude || '').toString();
 		this.state.servingStyle = (payload.servingStyle || '').toString();
 		this.state.customDescription = (payload.customDescription || '').toString();
 		this.state.specialRequests = (payload.specialRequests || '').toString();
@@ -131,6 +183,8 @@
 		this.$root.find('[name="event_date"]').val(this.state.eventDate);
 		this.$root.find('[name="guest_count"]').val(this.state.guestCount > 0 ? this.state.guestCount : '');
 		this.$root.find('[name="location"]').val(this.state.location);
+		this.$root.find('[name="location_latitude"]').val(this.state.locationLatitude);
+		this.$root.find('[name="location_longitude"]').val(this.state.locationLongitude);
 		this.$root.find('[name="serving_style"]').val(this.state.servingStyle);
 		this.$root.find('[name="custom_description"]').val(this.state.customDescription);
 		this.$root.find('[name="special_requests"]').val(this.state.specialRequests);
@@ -161,7 +215,39 @@
 		});
 
 		this.$root.on('change input', 'input[name="location"]', function () {
-			self.state.location = ($(this).val() || '').toString();
+			var query = ($(this).val() || '').toString().trim();
+			self.state.location = query;
+
+			// Reset coordinates when input changes manually
+			self.$locationLatitude.val('');
+			self.$locationLongitude.val('');
+
+			if (self.locationSearchTimer) {
+				window.clearTimeout(self.locationSearchTimer);
+			}
+
+			if (query.length < 3) {
+				self.renderLocationSuggestions([]);
+				return;
+			}
+
+			self.locationSearchTimer = window.setTimeout(function () {
+				self.searchLocations(query);
+			}, 250);
+		});
+
+		this.$root.on('click', '.restaurant-location-suggestion', function () {
+			var $item = $(this);
+			var address = ($item.data('address') || '').toString();
+			var lat = ($item.data('lat') || '').toString();
+			var lng = ($item.data('lng') || '').toString();
+
+			self.state.location = address;
+			self.$locationInput.val(address);
+			self.$locationLatitude.val(lat);
+			self.$locationLongitude.val(lng);
+
+			self.renderLocationSuggestions([]);
 		});
 
 		this.$root.on('change', 'select[name="serving_style"]', function () {
@@ -227,6 +313,66 @@
 		this.priceRequestTimer = window.setTimeout(function () {
 			self.updatePricePreview();
 		}, 250);
+	};
+
+	CateringWizard.prototype.searchLocations = function (query) {
+		var self = this;
+		var cfg = this.getAjaxConfig();
+
+		if (!cfg.ajaxUrl || !cfg.locationSearchNonce) {
+			self.renderLocationSuggestions([]);
+			return;
+		}
+
+		if (self.locationRequest && self.locationRequest.readyState !== 4) {
+			self.locationRequest.abort();
+		}
+
+		self.locationRequest = $.ajax({
+			url: cfg.ajaxUrl,
+			type: 'POST',
+			dataType: 'json',
+			data: {
+				action: 'restaurant_location_autocomplete',
+				nonce: cfg.locationSearchNonce,
+				q: query
+			}
+		}).done(function (response) {
+			if (!response || !response.success || !response.data || !Array.isArray(response.data.items)) {
+				self.renderLocationSuggestions([]);
+				return;
+			}
+
+			self.renderLocationSuggestions(response.data.items);
+		}).fail(function () {
+			self.renderLocationSuggestions([]);
+		});
+	};
+
+	CateringWizard.prototype.renderLocationSuggestions = function (suggestions) {
+		if (!this.$locationSuggestions.length) {
+			return;
+		}
+
+		if (!Array.isArray(suggestions) || !suggestions.length) {
+			this.$locationSuggestions.empty().attr('hidden', true);
+			return;
+		}
+
+		var html = '<ul class="restaurant-location-suggestions__list">';
+		suggestions.forEach(function (item) {
+			if (!item || !item.formatted_address) {
+				return;
+			}
+
+			var address = escapeHtml(item.formatted_address.toString());
+			var lat = escapeHtml((item.latitude || '').toString());
+			var lng = escapeHtml((item.longitude || '').toString());
+			html += '<li><button type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</button></li>';
+		});
+		html += '</ul>';
+
+		this.$locationSuggestions.html(html).attr('hidden', false);
 	};
 
 	CateringWizard.prototype.updatePricePreview = function () {
@@ -538,6 +684,8 @@
 				event_date: this.state.eventDate,
 				guest_count: this.state.guestCount,
 				location: this.state.location,
+				location_latitude: this.$locationLatitude.val(),
+				location_longitude: this.$locationLongitude.val(),
 				serving_style: this.state.servingStyle,
 				menu_quantities: this.state.menuQuantities,
 				custom_description: this.state.customDescription,
@@ -613,6 +761,8 @@
 				event_date: this.state.eventDate,
 				guest_count: this.state.guestCount,
 				location: this.state.location,
+				location_latitude: this.$locationLatitude.val(),
+				location_longitude: this.$locationLongitude.val(),
 				serving_style: this.state.servingStyle,
 				menu_quantities: this.state.menuQuantities,
 				custom_description: this.state.customDescription,
@@ -629,6 +779,8 @@
 					if (response.data && response.data.request_id) {
 						self.$root.attr('data-request-id', response.data.request_id);
 					}
+					self.reset();
+					self.syncUI();
 					return;
 				}
 				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to submit request.';

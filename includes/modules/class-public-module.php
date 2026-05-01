@@ -1182,7 +1182,7 @@ class Public_Module extends Abstract_Module {
 	 * @return void
 	 */
 	protected function send_catering_request_admin_notification( $request_id, $payload ) {
-		$admin_email = sanitize_email( (string) get_option( 'admin_email' ) );
+		$admin_email = sanitize_email( (string) get_option( 'restaurant_admin_notification_email', get_option( 'admin_email' ) ) );
 
 		if ( '' === $admin_email ) {
 			return;
@@ -1222,8 +1222,27 @@ class Public_Module extends Abstract_Module {
 		$edit_link = admin_url( 'post.php?post=' . absint( $request_id ) . '&action=edit' );
 		$subject   = sprintf( __( 'New Catering Request #%d', 'restaurant-food-services' ), absint( $request_id ) );
 
-		$message  = '<div style="font-family:Arial,sans-serif;line-height:1.5;color:#222;">';
-		$message .= '<h2 style="margin:0 0 12px;">' . esc_html__( 'New Catering Request Submitted', 'restaurant-food-services' ) . '</h2>';
+		$logo_id   = get_theme_mod( 'custom_logo' );
+		$logo_html = '';
+
+		if ( $logo_id ) {
+			$logo_src = wp_get_attachment_image_src( $logo_id, 'full' );
+			if ( $logo_src ) {
+				$logo_html = sprintf(
+					'<div style="margin-bottom: 25px;"><img src="%s" alt="%s" style="max-width: 200px; height: auto;"></div>',
+					esc_url( $logo_src[0] ),
+					esc_attr( get_bloginfo( 'name' ) )
+				);
+			}
+		}
+
+		if ( empty( $logo_html ) ) {
+			$logo_html = sprintf( '<h1 style="margin: 0 0 20px; color: #1a1a1b;">%s</h1>', esc_html( get_bloginfo( 'name' ) ) );
+		}
+
+		$message  = '<div style="font-family:Arial,sans-serif;line-height:1.5;color:#222;max-width:800px;margin:0 auto;padding:20px;border:1px solid #eee;">';
+		$message .= $logo_html;
+		$message .= '<h2 style="margin:0 0 12px; border-bottom: 2px solid #fbb03b; padding-bottom: 8px;">' . esc_html__( 'New Catering Request Submitted', 'restaurant-food-services' ) . '</h2>';
 		$message .= '<p style="margin:0 0 14px;">' . esc_html__( 'A new catering request has been submitted. Review the details below.', 'restaurant-food-services' ) . '</p>';
 		$message .= '<h3 style="margin:16px 0 8px;">' . esc_html__( 'Event Details', 'restaurant-food-services' ) . '</h3>';
 		$message .= '<table style="border-collapse:collapse;width:100%;max-width:760px;">';

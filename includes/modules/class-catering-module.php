@@ -157,6 +157,19 @@ class Catering_Module extends Abstract_Module {
 
 			<div class="restaurant-catering-settings-notices" aria-live="polite"></div>
 
+			<div class="restaurant-catering-settings-section" style="margin-bottom: 30px;">
+				<h2><?php esc_html_e( 'General Notifications', 'restaurant-food-services' ); ?></h2>
+				<p><?php esc_html_e( 'Configure the shop owner email address that will receive admin notifications for catering requests and orders.', 'restaurant-food-services' ); ?></p>
+				<div class="restaurant-catering-settings-inline-form">
+					<form class="restaurant-catering-settings-admin-email-form" style="display: flex; gap: 10px; align-items: center; width: 100%;">
+						<?php wp_nonce_field( 'restaurant_catering_settings_options', 'restaurant_catering_settings_nonce' ); ?>
+						<input type="hidden" name="operation" value="save_admin_email">
+						<input type="email" name="admin_notification_email" class="regular-text" value="<?php echo esc_attr( get_option( 'restaurant_admin_notification_email', get_option( 'admin_email' ) ) ); ?>" placeholder="<?php esc_attr_e( 'Shop Owner Email', 'restaurant-food-services' ); ?>" required>
+						<button type="submit" class="button button-primary"><?php esc_html_e( 'Save Email', 'restaurant-food-services' ); ?></button>
+					</form>
+				</div>
+			</div>
+
 			<div class="restaurant-catering-settings-grid">
 				<?php
 				echo $this->render_catering_settings_section(
@@ -395,6 +408,18 @@ class Catering_Module extends Abstract_Module {
 
 		$option_name   = isset( $_POST['option_name'] ) ? sanitize_key( wp_unslash( $_POST['option_name'] ) ) : '';
 		$operation     = isset( $_POST['operation'] ) ? sanitize_key( wp_unslash( $_POST['operation'] ) ) : '';
+
+		if ( 'save_admin_email' === $operation ) {
+			$email = isset( $_POST['admin_notification_email'] ) ? sanitize_email( wp_unslash( $_POST['admin_notification_email'] ) ) : '';
+
+			if ( ! is_email( $email ) ) {
+				wp_send_json_error( array( 'message' => esc_html__( 'Please provide a valid email address.', 'restaurant-food-services' ) ), 400 );
+			}
+
+			update_option( 'restaurant_admin_notification_email', $email );
+			wp_send_json_success( array( 'message' => esc_html__( 'Admin notification email saved.', 'restaurant-food-services' ) ) );
+		}
+
 		$offering_page = isset( $_POST['offering_page'] ) ? max( 1, absint( wp_unslash( $_POST['offering_page'] ) ) ) : 1;
 		$service_page  = isset( $_POST['service_page'] ) ? max( 1, absint( wp_unslash( $_POST['service_page'] ) ) ) : 1;
 		$course_page   = isset( $_POST['course_page'] ) ? max( 1, absint( wp_unslash( $_POST['course_page'] ) ) ) : 1;

@@ -39,6 +39,52 @@ class Emails_Module extends Abstract_Module {
 		$loader->add_action( 'restaurant_food_services_subscription_created', $this, 'send_subscription_created_email' );
 		$loader->add_action( 'restaurant_food_services_catering_request_submitted', $this, 'send_catering_request_submitted_email' );
 		$loader->add_action( 'restaurant_food_services_catering_approved', $this, 'send_catering_approved_email' );
+		$loader->add_filter( 'woocommerce_email_recipient_new_order', $this, 'filter_admin_email_recipient', 10, 2 );
+		$loader->add_filter( 'woocommerce_email_recipient_cancelled_order', $this, 'filter_admin_email_recipient', 10, 2 );
+		$loader->add_filter( 'woocommerce_email_recipient_failed_order', $this, 'filter_admin_email_recipient', 10, 2 );
+		$loader->add_filter( 'option_woocommerce_email_header_image', $this, 'maybe_provide_default_email_logo' );
+	}
+
+	/**
+	 * Provides the site logo as a fallback for WooCommerce email header image.
+	 *
+	 * @param string $value Current option value.
+	 *
+	 * @return string
+	 */
+	public function maybe_provide_default_email_logo( $value ) {
+		if ( ! empty( $value ) ) {
+			return $value;
+		}
+
+		$logo_id = get_theme_mod( 'custom_logo' );
+
+		if ( $logo_id ) {
+			$logo_src = wp_get_attachment_image_src( $logo_id, 'full' );
+			if ( $logo_src ) {
+				return $logo_src[0];
+			}
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Filters WooCommerce admin email recipients to use the shop owner email setting.
+	 *
+	 * @param string          $recipient Email recipient(s).
+	 * @param \WC_Order|null  $order     Order object.
+	 *
+	 * @return string
+	 */
+	public function filter_admin_email_recipient( $recipient, $order = null ) {
+		$custom_email = sanitize_email( (string) get_option( 'restaurant_admin_notification_email' ) );
+
+		if ( '' !== $custom_email ) {
+			return $custom_email;
+		}
+
+		return $recipient;
 	}
 
 	/**

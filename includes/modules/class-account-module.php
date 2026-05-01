@@ -156,27 +156,53 @@ class Account_Module extends Abstract_Module {
 	public function render_login_logout_shortcode( $atts = array() ) {
 		$atts = shortcode_atts(
 			array(
-				'class' => 'button',
+				'class' => '',
 			),
 			(array) $atts,
 			'restaurant_login_logout'
 		);
 
+		$output = '<div class="restaurant-auth-nav">';
+		$current_url = home_url( add_query_arg( array(), $GLOBALS['wp']->request ) );
+
 		if ( is_user_logged_in() ) {
-			$url   = $this->get_logout_url();
-			$label = __( 'Log Out', 'restaurant-food-services' );
+			$account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
+			$logout_url  = $this->get_logout_url();
+
+			$is_account_active = ( function_exists( 'is_account_page' ) && is_account_page() ) || ( rtrim( $current_url, '/' ) === rtrim( $account_url, '/' ) );
+			$account_class     = $is_account_active ? trim( $atts['class'] . ' is-active' ) : $atts['class'];
+
+			$output .= sprintf(
+				'<a href="%s" class="%s"><span class="dashicons dashicons-admin-users"></span> %s</a>',
+				esc_url( $account_url ),
+				esc_attr( $account_class ),
+				esc_html__( 'My Account', 'restaurant-food-services' )
+			);
+
+			$output .= sprintf(
+				'<a href="%s" class="%s"><span class="dashicons dashicons-signout"></span> %s</a>',
+				esc_url( $logout_url ),
+				esc_attr( $atts['class'] ),
+				esc_html__( 'Sign Out', 'restaurant-food-services' )
+			);
 		} else {
 			$signup_page_id = $this->get_signup_page_id();
 			$url            = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : wp_login_url();
-			$label          = __( 'Log In', 'restaurant-food-services' );
+			
+			$is_login_active = ( rtrim( $current_url, '/' ) === rtrim( $url, '/' ) );
+			$login_class     = $is_login_active ? trim( $atts['class'] . ' is-active' ) : $atts['class'];
+
+			$output .= sprintf(
+				'<a href="%s" class="%s"><span class="dashicons dashicons-admin-users"></span> %s</a>',
+				esc_url( $url ),
+				esc_attr( $login_class ),
+				esc_html__( 'Sign In', 'restaurant-food-services' )
+			);
 		}
 
-		return sprintf(
-			'<a href="%s" class="%s">%s</a>',
-			esc_url( $url ),
-			esc_attr( $atts['class'] ),
-			esc_html( $label )
-		);
+		$output .= '</div>';
+
+		return $output;
 	}
 
 	/**

@@ -899,9 +899,46 @@
 }
 
 /* Submission loading indicator */
-@keyframes restaurant-spin {
-	0% { transform: rotate(0deg); }
-	100% { transform: rotate(360deg); }
+.restaurant-auth-nav {
+	display: inline-flex;
+	align-items: center;
+	gap: 1.25rem;
+}
+
+.restaurant-auth-nav a {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	text-decoration: none;
+	font-weight: 600;
+	color: #1a1a1b; /* High contrast inactive color */
+	padding: 0.4rem 0.75rem;
+	border-radius: 6px;
+	transition: all 0.2s ease-in-out;
+}
+
+.restaurant-auth-nav a .dashicons {
+	color: inherit;
+	font-size: 1.2rem;
+	width: 1.2rem;
+	height: 1.2rem;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.restaurant-auth-nav a:hover {
+	color: var(--brens-primary, #fbb03b);
+	background-color: rgba(251, 176, 59, 0.08); /* Subtle hover background */
+}
+
+.restaurant-auth-nav a.is-active {
+	background-color: var(--brens-primary, #fbb03b);
+	color: #fff !important; /* High contrast white text on primary background */
+}
+
+.restaurant-auth-nav a.is-active .dashicons {
+	color: #fff;
 }
 
 .restaurant-wizard-submission-status {

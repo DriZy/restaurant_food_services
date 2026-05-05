@@ -149,11 +149,12 @@ class Catering_Module extends Abstract_Module {
 		$offering_page = isset( $_GET['offering_page'] ) ? max( 1, absint( $_GET['offering_page'] ) ) : 1;
 		$service_page  = isset( $_GET['service_page'] ) ? max( 1, absint( $_GET['service_page'] ) ) : 1;
 		$course_page   = isset( $_GET['course_page'] ) ? max( 1, absint( $_GET['course_page'] ) ) : 1;
+		$location_page = isset( $_GET['location_page'] ) ? max( 1, absint( $_GET['location_page'] ) ) : 1;
 
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Catering Settings', 'restaurant-food-services' ); ?></h1>
-			<p><?php esc_html_e( 'Manage catering offerings and service options used by the frontend wizard. Changes are saved instantly without reloading this page.', 'restaurant-food-services' ); ?></p>
+			<p><?php esc_html_e( 'Manage catering offerings, service options, and locations used by the frontend wizard. Changes are saved instantly without reloading this page.', 'restaurant-food-services' ); ?></p>
 
 			<div class="restaurant-catering-settings-notices" aria-live="polite"></div>
 
@@ -193,7 +194,17 @@ class Catering_Module extends Abstract_Module {
 					$course_page,
 					$offering_page,
 					$service_page,
-					$course_page
+					$course_page,
+					$location_page
+				);
+
+				echo $this->render_catering_settings_section(
+					'restaurant_catering_location_options',
+					$location_page,
+					$offering_page,
+					$service_page,
+					$course_page,
+					$location_page
 				);
 				?>
 			</div>
@@ -523,12 +534,13 @@ class Catering_Module extends Abstract_Module {
 	 * @param string $option_name Option name.
 	 * @param int    $current_page Current page for this table.
 	 * @param int    $offering_page Current offerings page.
-	 * @param int    $service_page Current services page.
-	 * @param int    $course_page Current meal course page.
+	 * @param int    $service_page  Current services page.
+	 * @param int    $course_page   Current courses page.
+	 * @param int    $location_page Current locations page.
 	 *
 	 * @return string
 	 */
-	protected function render_catering_settings_section( $option_name, $current_page, $offering_page, $service_page, $course_page ) {
+	 protected function render_catering_settings_section( $option_name, $current_page, $offering_page, $service_page, $course_page, $location_page = 1 ) {
 		$options_per_page = 8;
 		$label            = $this->get_catering_settings_option_label( $option_name );
 		$options          = $this->get_catering_settings_options( $option_name );
@@ -550,6 +562,7 @@ class Catering_Module extends Abstract_Module {
 				<input type="hidden" name="offering_page" value="<?php echo esc_attr( (string) $offering_page ); ?>">
 				<input type="hidden" name="service_page" value="<?php echo esc_attr( (string) $service_page ); ?>">
 				<input type="hidden" name="course_page" value="<?php echo esc_attr( (string) $course_page ); ?>">
+				<input type="hidden" name="location_page" value="<?php echo esc_attr( (string) $location_page ); ?>">
 				<div class="restaurant-catering-settings-inline-form">
 					<label for="restaurant-settings-option-label-<?php echo esc_attr( $option_name ); ?>" class="screen-reader-text"><?php esc_html_e( 'Option label', 'restaurant-food-services' ); ?></label>
 					<input id="restaurant-settings-option-label-<?php echo esc_attr( $option_name ); ?>" type="text" class="regular-text" name="option_label" required placeholder="<?php esc_attr_e( 'Enter option label', 'restaurant-food-services' ); ?>">
@@ -587,6 +600,7 @@ class Catering_Module extends Abstract_Module {
 										<input type="hidden" name="offering_page" value="<?php echo esc_attr( (string) $offering_page ); ?>">
 										<input type="hidden" name="service_page" value="<?php echo esc_attr( (string) $service_page ); ?>">
 										<input type="hidden" name="course_page" value="<?php echo esc_attr( (string) $course_page ); ?>">
+										<input type="hidden" name="location_page" value="<?php echo esc_attr( (string) $location_page ); ?>">
 										<input type="hidden" name="operation" value="delete">
 										<button
 											type="button"
@@ -639,6 +653,7 @@ class Catering_Module extends Abstract_Module {
 			'restaurant_catering_offering_options' => esc_html__( 'Catering Offerings', 'restaurant-food-services' ),
 			'restaurant_catering_service_options'  => esc_html__( 'Service Options', 'restaurant-food-services' ),
 			'restaurant_catering_meal_course_options' => esc_html__( 'Meal Courses', 'restaurant-food-services' ),
+			'restaurant_catering_location_options' => esc_html__( 'Catering Locations', 'restaurant-food-services' ),
 		);
 	}
 
@@ -2337,19 +2352,18 @@ class Catering_Module extends Abstract_Module {
 		echo '</div>';
 
 		if ( is_user_logged_in() && comments_open( $post_id ) ) {
-			comment_form(
-				array(
-					'title_reply'          => esc_html__( 'Reply', 'restaurant-food-services' ),
-					'label_submit'         => esc_html__( 'Send Message', 'restaurant-food-services' ),
-					'comment_notes_before' => '',
-					'comment_notes_after'  => '',
-					'logged_in_as'         => '',
-					'class_form'           => 'restaurant-catering-chat-form',
-					'class_submit'         => 'button button-primary',
-					'comment_field'        => '<p class="comment-form-comment"><label for="comment">' . esc_html__( 'Message', 'restaurant-food-services' ) . '</label><textarea id="comment" name="comment" cols="45" rows="4" required="required"></textarea></p>',
-				),
-				$post_id
-			);
+			?>
+			<form action="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" method="post" class="restaurant-catering-chat-form">
+				<p class="restaurant-catering-chat-form-field">
+					<label for="restaurant-catering-chat-message" class="screen-reader-text"><?php esc_html_e( 'Message', 'restaurant-food-services' ); ?></label>
+					<textarea id="restaurant-catering-chat-message" name="comment" cols="45" rows="3" placeholder="<?php esc_attr_e( 'Type your message here...', 'restaurant-food-services' ); ?>" required></textarea>
+				</p>
+				<p class="restaurant-catering-chat-form-submit">
+					<input type="hidden" name="comment_post_ID" value="<?php echo esc_attr( (string) $post_id ); ?>">
+					<button type="submit" class="button button-primary"><?php esc_html_e( 'Send Message', 'restaurant-food-services' ); ?></button>
+				</p>
+			</form>
+			<?php
 		}
 
 		echo '</div>';
@@ -2361,22 +2375,6 @@ class Catering_Module extends Abstract_Module {
 		}
 
 		$assets_printed = true;
-
-		echo '<style>
-		.restaurant-catering-chat{border:1px solid #e5e5e5;border-radius:6px;padding:12px;background:#fff;}
-		.restaurant-catering-chat h4{margin:0 0 10px;}
-		.restaurant-catering-chat-messages{max-height:260px;overflow:auto;border:1px solid #ececec;border-radius:4px;padding:10px;background:#fafafa;margin-bottom:12px;}
-		.restaurant-catering-chat-message{padding:8px 10px;border-radius:4px;background:#fff;border:1px solid #e9e9e9;margin-bottom:8px;}
-		.restaurant-catering-chat-message:last-child{margin-bottom:0;}
-		.restaurant-catering-chat-message header{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:#666;margin-bottom:6px;}
-		.restaurant-catering-chat-message--owner{border-left:3px solid #2c7be5;}
-		.restaurant-catering-chat-message--admin{border-left:3px solid #2ea44f;}
-		.restaurant-catering-chat-message--user{border-left:3px solid #888;}
-		.restaurant-catering-chat-form .comment-form-author,
-		.restaurant-catering-chat-form .comment-form-email,
-		.restaurant-catering-chat-form .comment-form-url,
-		.restaurant-catering-chat-form .form-submit{margin-top:10px;}
-		</style>';
 
 		echo '<script>
 		(function(){
@@ -2390,6 +2388,7 @@ class Catering_Module extends Abstract_Module {
 			} else {
 				scrollCateringChats();
 			}
+			window.addEventListener("resize", scrollCateringChats);
 		})();
 		</script>';
 	}
@@ -2467,6 +2466,8 @@ class Catering_Module extends Abstract_Module {
 		$comment_html .= '</article>';
 
 		// Return success with the new comment HTML
+		do_action( 'restaurant_food_services_catering_chat_message_sent', $comment_id, $catering_id );
+
 		wp_send_json_success(
 			array(
 				'message'      => esc_html__( 'Message sent successfully.', 'restaurant-food-services' ),

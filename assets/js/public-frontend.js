@@ -75,22 +75,95 @@
 		var $grid = $scope.nextAll('.restaurant-catering-menu-list, .restaurant-meals-grid').first();
 
 		if (!$grid.length) {
-			$grid = $scope.closest('.restaurant-wizard-panel, .restaurant-order-meals').find('.restaurant-catering-menu-list, .restaurant-meals-grid').first();
+			$grid = $scope.closest('.restaurant-wizard-panel, .restaurant-order-meals, .restaurant-meal-plans-wizard, .restaurant-catering-wizard').find('.restaurant-catering-menu-list, .restaurant-meals-grid').first();
 		}
 
+		if (!$grid.length) {
+			return;
+		}
+
+		// First, hide all cards and mark those that match the filter
 		$grid.find('.restaurant-meal-card').each(function () {
 			var $card = $(this);
 			var name = ($card.data('product-name') || '').toString();
 			var spice = ($card.data('spice-level') || '').toString();
 			var matchSearch = !searchTerm || name.indexOf(searchTerm) !== -1;
 			var matchSpice = !spiceValue || spice === spiceValue;
-			$card.toggle(matchSearch && matchSpice);
+			$card.data('matches-filter', matchSearch && matchSpice);
+			$card.hide();
 		});
 
+		// Determine which lists to process (course groups or the whole grid)
+		var $lists = $grid.find('.restaurant-meal-course-items');
+		if (!$lists.length) {
+			$lists = $grid;
+		}
+
+		var isWizard = $scope.closest('.restaurant-meal-plans-wizard, .restaurant-catering-wizard').length > 0;
+
+		$lists.each(function () {
+			var $list = $(this);
+			var $matchingItems = $list.find('.restaurant-meal-card').filter(function () {
+				return $(this).data('matches-filter');
+			});
+
+			if (isWizard) {
+				var currentlyShown = $list.data('currently-shown') || 5;
+				$matchingItems.slice(0, currentlyShown).show();
+
+				var $loadMoreContainer = $list.next('.restaurant-load-more-container');
+				if ($loadMoreContainer.length) {
+					if ($matchingItems.length > currentlyShown) {
+						$loadMoreContainer.show();
+					} else {
+						$loadMoreContainer.hide();
+					}
+				}
+			} else {
+				$matchingItems.show();
+			}
+		});
+
+		// Hide empty groups
 		$grid.find('.restaurant-meal-course-group').each(function () {
 			var $group = $(this);
-			var hasVisibleItems = $group.find('.restaurant-meal-card:visible').length > 0;
-			$group.toggle(hasVisibleItems);
+			var hasMatchingItems = $group.find('.restaurant-meal-card').filter(function () {
+				return $(this).data('matches-filter');
+			}).length > 0;
+			$group.toggle(hasMatchingItems);
+		});
+	}
+
+	function initPagination() {
+		$(document).on('click', '.restaurant-load-more-button', function (e) {
+			e.preventDefault();
+			var $btn = $(this);
+			var $container = $btn.closest('.restaurant-load-more-container');
+			var $list = $container.prev();
+
+			var currentlyShown = $list.data('currently-shown') || 5;
+			var nextShown = currentlyShown + 5;
+			$list.data('currently-shown', nextShown);
+
+			// Re-apply filters with updated "currently-shown"
+			var $scope = $list.closest('.restaurant-wizard-panel, .restaurant-order-meals, .restaurant-meal-plans-wizard, .restaurant-catering-wizard').find('.restaurant-filters');
+			if ($scope.length) {
+				applyFilters($scope.first());
+			}
+		});
+
+		// Initialize on load
+		$('.restaurant-filters').each(function () {
+			applyFilters($(this));
+		});
+
+		// Re-initialize when wizard steps change
+		$(document).on('click', '.restaurant-wizard-next, .restaurant-wizard-prev', function () {
+			setTimeout(function() {
+				$('.restaurant-filters').each(function () {
+					applyFilters($(this));
+				});
+			}, 10);
 		});
 	}
 
@@ -188,6 +261,7 @@
 	initCollapsibleFilters();
 	initMobileStickyCta();
 	initAuthTabSwitchers();
+	initPagination();
 
 	$(document).on('click', '.restaurant-ajax-add-to-cart', function (event) {
 		event.preventDefault();

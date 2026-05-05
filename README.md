@@ -13,6 +13,21 @@ Restaurant Food Services is a modular WooCommerce extension for restaurants and 
 - **WooCommerce emails**: includes custom customer emails for subscription created, catering request submitted, and catering approved events.
 - **Security and structure**: nonce checks, capability guards, sanitized inputs, escaped outputs, and module-driven hook registration via `Loader`.
 
+## Shortcodes
+
+The plugin provides several shortcodes to display the frontend interfaces:
+
+### Ordering & Wizards
+- `[restaurant_order_meals]`: Displays the standard meal ordering grid.
+- `[restaurant_meal_plans]`: Displays the weekly meal plan subscription wizard.
+- `[restaurant_catering]`: Displays the comprehensive catering request wizard.
+- `[restaurant_catering_form]`: Displays a simplified catering inquiry form.
+
+### Account & Authentication
+- `[restaurant_account]`: Displays the Restaurant Account Hub (includes login/signup switcher for guests).
+- `[restaurant_signup]`: Displays the signup-first authentication switcher.
+- `[restaurant_login_logout]`: Displays a context-aware Login or Logout link.
+
 ## Structure
 
 - `restaurant-food-services.php` - Main plugin bootstrap file.
@@ -72,46 +87,6 @@ Run the integration smoke check:
 /Users/idristabi/Projects/wordpress/brenssmallchops/wp-content/plugins/restaurant-food-services/scripts/integration-smoke-check.sh
 ```
 
-Manual flow checks in wp-admin/storefront:
-
-1. Meal order flow
-   - Mark a product as meal plan (`is_meal_plan=yes`) and set meals per week.
-   - Place a WooCommerce order for that product.
-   - Confirm delivery fields save on order and no checkout validation errors.
-
-2. Subscription flow
-   - Complete checkout with a meal-plan product.
-   - Verify row is created in `wp_restaurant_subscriptions`.
-   - Verify account endpoint `my-subscriptions` renders and pause/resume/cancel actions work.
-   - Verify "Subscription Created" email is present in WooCommerce > Settings > Emails and sends.
-
-3. Catering flow
-   - Submit `[restaurant_catering_form]` with valid nonce/fields.
-   - Verify `catering_request` post is created with pending status.
-   - Approve via admin status change or Convert to Order.
-   - Verify "Catering Request Submitted" and "Catering Approved" emails trigger once.
-
-4. Account auth flow
-   - Visit a page containing `[restaurant_signup]` or `[restaurant_account]` while logged out.
-   - Confirm **Sign up** is shown first and **Sign in** can be switched to instantly.
-   - Try to access `your-site.com/wp-login.php` as a guest; confirm you are redirected to the page with `[restaurant_signup]`.
-   - Use `[restaurant_login_logout]` in a widget or menu and verify it toggles correctly between Log In/Log Out.
-   - Disable WooCommerce registration to confirm the UI falls back to the sign-in form only.
-
 ## Notes
 
 This scaffold is ready for additional restaurant and food service features, admin screens, API integrations, and custom post types.
-
-
- - Verify "Catering Request Submitted" and "Catering Approved" emails trigger once.
-
-4. Account auth flow
-   - Visit a page containing `[restaurant_signup]` or `[restaurant_account]` while logged out.
-   - Confirm **Sign up** is shown first and **Sign in** can be switched to instantly.
-   - Disable WooCommerce registration to confirm the UI falls back to the sign-in form only.
-
-## Notes
-
-This scaffold is ready for additional restaurant and food service features, admin screens, API integrations, and custom post types.
-
-

@@ -223,20 +223,37 @@ class Public_Module extends Abstract_Module {
 
 		echo '<section class="restaurant-wizard-panel is-active" data-step="1">';
 		echo '<h3>' . esc_html__( 'Step 1: Event Details', 'restaurant-food-services' ) . '</h3>';
-		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Catering Offering', 'restaurant-food-services' ) . '</label><select class="restaurant-wizard-input input-text" name="event_type">';
+		echo '<div class="restaurant-wizard-fields-grid">';
+		
+		echo '<div class="restaurant-wizard-field-card restaurant-offering-selection-card">';
+		echo '<label>' . esc_html__( 'Catering Offering', 'restaurant-food-services' ) . '</label>';
+		echo '<select name="event_type" class="restaurant-wizard-input input-text">';
 		echo '<option value="">' . esc_html__( 'Select an offering', 'restaurant-food-services' ) . '</option>';
 		foreach ( $offering_options as $value => $label ) {
 			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
 		}
-		echo '</select></p>';
-		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Event Date', 'restaurant-food-services' ) . '</label><input type="date" class="restaurant-wizard-input input-text" name="event_date" min="' . esc_attr( $min_event_date ) . '" /></p>';
-		echo '<p class="form-row form-row-wide"><label>' . esc_html__( 'Guest Count', 'restaurant-food-services' ) . '</label><input type="number" min="1" class="restaurant-wizard-input input-text" name="guest_count" /></p>';
-		echo '<p class="form-row form-row-wide restaurant-location-field"><label>' . esc_html__( 'Location', 'restaurant-food-services' ) . '</label>';
+		echo '</select>';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label>' . esc_html__( 'Event Date', 'restaurant-food-services' ) . '</label>';
+		echo '<input type="date" class="restaurant-wizard-input input-text" name="event_date" min="' . esc_attr( $min_event_date ) . '" />';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label>' . esc_html__( 'Guest Count', 'restaurant-food-services' ) . '</label>';
+		echo '<input type="number" min="1" class="restaurant-wizard-input input-text" name="guest_count" />';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-field-card restaurant-location-field">';
+		echo '<label>' . esc_html__( 'Location', 'restaurant-food-services' ) . '</label>';
 		echo '<input type="text" class="restaurant-wizard-input input-text" name="location" autocomplete="off" required />';
 		echo '<input type="hidden" name="location_latitude" value="" />';
 		echo '<input type="hidden" name="location_longitude" value="" />';
 		echo '<div class="restaurant-location-suggestions" hidden></div>';
-		echo '</p>';
+		echo '</div>';
+		
+		echo '</div>';
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="2">';
@@ -269,11 +286,11 @@ class Public_Module extends Abstract_Module {
 
 					echo '<article class="restaurant-meal-card restaurant-catering-meal-row restaurant-meal-row" role="listitem" data-product-name="' . esc_attr( strtolower( $product_name ) ) . '">';
 					echo '<div class="restaurant-meal-row__left">';
-					echo '<a class="restaurant-meal-card__image-link restaurant-meal-row__image" href="' . esc_url( $product_link ) . '">';
+					echo '<div class="restaurant-meal-card__image-link restaurant-meal-row__image">';
 					echo $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'restaurant-meal-card__image' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-					echo '</a>';
+					echo '</div>';
 					echo '<div class="restaurant-meal-card__content restaurant-meal-row__content">';
-					echo '<h5 class="restaurant-meal-card__title"><a href="' . esc_url( $product_link ) . '">' . esc_html( $product_name ) . '</a></h5>';
+					echo '<h5 class="restaurant-meal-card__title">' . esc_html( $product_name ) . '</h5>';
 					echo '<div class="restaurant-meal-card__price">' . wp_kses_post( $product->get_price_html() ) . '</div>';
 					echo '<p class="restaurant-meal-card__spice"><strong>' . esc_html__( 'Spice Level:', 'restaurant-food-services' ) . '</strong> ' . esc_html( $spice_label ) . '</p>';
 					echo '</div>';
@@ -287,6 +304,9 @@ class Public_Module extends Abstract_Module {
 					echo '</article>';
 				}
 
+				echo '</div>';
+				echo '<div class="restaurant-load-more-container" style="display: none;">';
+				echo '<button type="button" class="button restaurant-load-more-button">' . esc_html__( 'Load More', 'restaurant-food-services' ) . '</button>';
 				echo '</div>';
 				echo '</section>';
 			}
@@ -345,6 +365,7 @@ class Public_Module extends Abstract_Module {
 	 * @return void
 	 */
 	public function render_meal_plans_wizard_ui() {
+		$weekly_menus  = $this->get_active_weekly_menus();
 		$meal_products = $this->get_meal_choice_products();
 		$window        = $this->get_meal_plan_subscription_window();
 		$is_open       = $this->is_meal_plan_subscription_window_open();
@@ -360,7 +381,7 @@ class Public_Module extends Abstract_Module {
 		}
 
 		echo '<ol class="restaurant-wizard-steps">';
-		echo '<li data-step="1" class="is-active">' . esc_html__( 'Plan Type', 'restaurant-food-services' ) . '</li>';
+		echo '<li data-step="1" class="is-active">' . esc_html__( 'Choose Plan', 'restaurant-food-services' ) . '</li>';
 		echo '<li data-step="2">' . esc_html__( 'Meals Per Week', 'restaurant-food-services' ) . '</li>';
 		echo '<li data-step="3">' . esc_html__( 'Choose Meals', 'restaurant-food-services' ) . '</li>';
 		echo '<li data-step="4">' . esc_html__( 'Delivery Preferences', 'restaurant-food-services' ) . '</li>';
@@ -368,10 +389,21 @@ class Public_Module extends Abstract_Module {
 		echo '</ol>';
 
 		echo '<div class="restaurant-wizard-panels">';
+
 		echo '<section class="restaurant-wizard-panel is-active" data-step="1">';
-		echo '<h3>' . esc_html__( 'Step 1: Choose Plan Type', 'restaurant-food-services' ) . '</h3>';
-		echo '<label><input type="radio" name="plan_type" value="individual"> ' . esc_html__( 'Individual', 'restaurant-food-services' ) . '</label>';
-		echo '<label><input type="radio" name="plan_type" value="family"> ' . esc_html__( 'Family', 'restaurant-food-services' ) . '</label>';
+		echo '<h3>' . esc_html__( 'Step 1: Choose Your Plan', 'restaurant-food-services' ) . '</h3>';
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label><input type="radio" name="plan_type" value="individual" checked> ' . esc_html__( 'Individual Plan', 'restaurant-food-services' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Perfect for one person.', 'restaurant-food-services' ) . '</p>';
+		echo '</div>';
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label><input type="radio" name="plan_type" value="family"> ' . esc_html__( 'Family Plan', 'restaurant-food-services' ) . '</label>';
+		echo '<p class="description">' . esc_html__( 'Best for families and groups.', 'restaurant-food-services' ) . '</p>';
+		echo '<div class="restaurant-family-size-field" style="display: none; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">';
+		echo '<label for="family_size">' . esc_html__( 'How many persons?', 'restaurant-food-services' ) . '</label>';
+		echo '<input type="number" id="family_size" name="family_size" min="2" value="2" class="restaurant-wizard-input input-text">';
+		echo '</div>';
+		echo '</div>';
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="2">';
@@ -403,13 +435,14 @@ class Public_Module extends Abstract_Module {
 				$spice_level = sanitize_text_field( (string) get_post_meta( $product_id, 'spice_level', true ) );
 				$spice_label = '' !== $spice_level ? ucfirst( $spice_level ) : __( 'Not specified', 'restaurant-food-services' );
 				$quantity_id = 'restaurant-meal-plan-qty-' . $product_id;
+
 				echo '<article class="restaurant-meal-card restaurant-meal-row restaurant-meal-plan-row" role="listitem" data-product-name="' . esc_attr( strtolower( $product->get_name() ) ) . '" data-spice-level="' . esc_attr( strtolower( $spice_level ) ) . '">';
 				echo '<div class="restaurant-meal-row__left">';
-				echo '<a class="restaurant-meal-card__image-link restaurant-meal-row__image" href="' . esc_url( $product->get_permalink() ) . '">';
+				echo '<div class="restaurant-meal-card__image-link restaurant-meal-row__image">';
 				echo $product->get_image( 'woocommerce_thumbnail', array( 'class' => 'restaurant-meal-card__image' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-				echo '</a>';
+				echo '</div>';
 				echo '<div class="restaurant-meal-card__content restaurant-meal-row__content">';
-				echo '<h4 class="restaurant-meal-card__title"><a href="' . esc_url( $product->get_permalink() ) . '">' . esc_html( $product->get_name() ) . '</a></h4>';
+				echo '<h4 class="restaurant-meal-card__title">' . esc_html( $product->get_name() ) . '</h4>';
 				echo '<div class="restaurant-meal-card__price">' . wp_kses_post( $product->get_price_html() ) . '</div>';
 				echo '<p class="restaurant-meal-card__spice"><strong>' . esc_html__( 'Spice Level:', 'restaurant-food-services' ) . '</strong> ' . esc_html( $spice_label ) . '</p>';
 				echo '</div>';
@@ -424,23 +457,38 @@ class Public_Module extends Abstract_Module {
 			}
 		}
 		echo '</div>';
+		echo '<div class="restaurant-load-more-container" style="display: none;">';
+		echo '<button type="button" class="button restaurant-load-more-button">' . esc_html__( 'Load More', 'restaurant-food-services' ) . '</button>';
+		echo '</div>';
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="4">';
 		echo '<h3>' . esc_html__( 'Step 4: Delivery Preferences', 'restaurant-food-services' ) . '</h3>';
-		echo '<p class="form-row form-row-wide restaurant-delivery-location">';
+		echo '<div class="restaurant-wizard-fields-grid">';
+		
+		echo '<div class="restaurant-wizard-field-card restaurant-delivery-location">';
 		echo '<label>' . esc_html__( 'Delivery Location', 'restaurant-food-services' ) . '</label>';
 		echo '<input type="text" class="restaurant-wizard-input input-text" name="delivery_location" autocomplete="off" required />';
 		echo '<input type="hidden" name="delivery_latitude" value="" />';
 		echo '<input type="hidden" name="delivery_longitude" value="" />';
 		echo '<div class="restaurant-location-suggestions" hidden></div>';
-		echo '</p>';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label>' . esc_html__( 'Delivery Days', 'restaurant-food-services' ) . '</label>';
 		echo '<div class="restaurant-delivery-days">';
 		foreach ( array( 'sunday' ) as $day ) {
 			echo '<label><input type="checkbox" class="restaurant-delivery-day" value="' . esc_attr( $day ) . '"> ' . esc_html( ucfirst( $day ) ) . '</label>';
 		}
 		echo '</div>';
-		echo '<p class="form-row form-row-wide restaurant-delivery-time"><label>' . esc_html__( 'Preferred Time Slot', 'restaurant-food-services' ) . '</label><select name="delivery_time" class="restaurant-wizard-input input-text"><option value="morning">' . esc_html__( 'Morning', 'restaurant-food-services' ) . '</option><option value="afternoon">' . esc_html__( 'Afternoon', 'restaurant-food-services' ) . '</option><option value="evening">' . esc_html__( 'Evening', 'restaurant-food-services' ) . '</option></select></p>';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-field-card">';
+		echo '<label>' . esc_html__( 'Preferred Time Slot', 'restaurant-food-services' ) . '</label>';
+		echo '<select name="delivery_time" class="restaurant-wizard-input input-text"><option value="morning">' . esc_html__( 'Morning', 'restaurant-food-services' ) . '</option><option value="afternoon">' . esc_html__( 'Afternoon', 'restaurant-food-services' ) . '</option><option value="evening">' . esc_html__( 'Evening', 'restaurant-food-services' ) . '</option></select>';
+		echo '</div>';
+
+		echo '</div>';
 		echo '</section>';
 
 		echo '<section class="restaurant-wizard-panel" data-step="5">';
@@ -468,12 +516,23 @@ class Public_Module extends Abstract_Module {
 	 * @return array<int,\WC_Product>
 	 */
 	protected function get_meal_choice_products() {
-		$weekly_menu_ids = $this->get_active_weekly_menu_meal_ids();
+		$weekly_menus = $this->get_active_weekly_menus();
+		$meal_ids     = array();
 
-		if ( ! empty( $weekly_menu_ids ) ) {
+		if ( ! empty( $weekly_menus ) ) {
+			foreach ( $weekly_menus as $menu ) {
+				$decoded = json_decode( (string) $menu->meals, true );
+				if ( is_array( $decoded ) ) {
+					$meal_ids = array_merge( $meal_ids, $decoded );
+				}
+			}
+			$meal_ids = array_values( array_unique( array_filter( array_map( 'absint', $meal_ids ) ) ) );
+		}
+
+		if ( ! empty( $meal_ids ) ) {
 			$weekly_products = array();
 
-			foreach ( $weekly_menu_ids as $product_id ) {
+			foreach ( $meal_ids as $product_id ) {
 				$product = wc_get_product( $product_id );
 
 				if ( ! $product instanceof \WC_Product || ! $product->is_purchasable() || ! $product->is_in_stock() ) {
@@ -527,11 +586,11 @@ class Public_Module extends Abstract_Module {
 	}
 
 	/**
-	 * Returns product IDs from currently active admin weekly menu.
+	 * Returns all currently active weekly menus.
 	 *
-	 * @return array<int,int>
+	 * @return array<int,object>
 	 */
-	protected function get_active_weekly_menu_meal_ids() {
+	protected function get_active_weekly_menus() {
 		global $wpdb;
 
 		$table_name = $wpdb->prefix . 'restaurant_weekly_menus';
@@ -543,13 +602,49 @@ class Public_Module extends Abstract_Module {
 			return array();
 		}
 
-		$row = $wpdb->get_row(
+		return $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT meals FROM {$table_name} WHERE week_start <= %s AND week_end >= %s ORDER BY week_start DESC LIMIT 1",
+				"SELECT id, menu_name, meals FROM {$table_name} WHERE week_start <= %s AND week_end >= %s ORDER BY menu_name ASC",
 				$today,
 				$today
 			)
 		);
+	}
+
+	/**
+	 * Returns product IDs from currently active admin weekly menu.
+	 *
+	 * @param int $menu_id Optional specific menu ID.
+	 * @return array<int,int>
+	 */
+	protected function get_active_weekly_menu_meal_ids( $menu_id = 0 ) {
+		global $wpdb;
+
+		$table_name = $wpdb->prefix . 'restaurant_weekly_menus';
+		$today      = wp_date( 'Y-m-d' );
+
+		$table_exists = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
+
+		if ( ! is_string( $table_exists ) || $table_exists !== $table_name ) {
+			return array();
+		}
+
+		if ( $menu_id > 0 ) {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT meals FROM {$table_name} WHERE id = %d",
+					$menu_id
+				)
+			);
+		} else {
+			$row = $wpdb->get_row(
+				$wpdb->prepare(
+					"SELECT meals FROM {$table_name} WHERE week_start <= %s AND week_end >= %s ORDER BY week_start DESC LIMIT 1",
+					$today,
+					$today
+				)
+			);
+		}
 
 		if ( ! $row || ! isset( $row->meals ) ) {
 			return array();
@@ -1302,7 +1397,9 @@ class Public_Module extends Abstract_Module {
 			wp_send_json_error( array( 'message' => esc_html__( 'Meal plans for this week are closed. Please subscribe for next week.', 'restaurant-food-services' ) ), 400 );
 		}
 
+		$weekly_menu_id = isset( $_POST['weekly_menu_id'] ) ? absint( wp_unslash( $_POST['weekly_menu_id'] ) ) : 0;
 		$plan_type      = isset( $_POST['plan_type'] ) ? sanitize_text_field( wp_unslash( $_POST['plan_type'] ) ) : '';
+		$family_size    = isset( $_POST['family_size'] ) ? absint( wp_unslash( $_POST['family_size'] ) ) : 1;
 		$meals_per_week = isset( $_POST['meals_per_week'] ) ? absint( wp_unslash( $_POST['meals_per_week'] ) ) : 0;
 		$raw_selected_meals = isset( $_POST['selected_meals'] ) ? (array) wp_unslash( $_POST['selected_meals'] ) : array();
 		$selected_meals = array();
@@ -1331,7 +1428,7 @@ class Public_Module extends Abstract_Module {
 		}
 
 		if ( empty( $selected_meals ) ) {
-			foreach ( $this->get_active_weekly_menu_meal_ids() as $weekly_meal_id ) {
+			foreach ( $this->get_active_weekly_menu_meal_ids( $weekly_menu_id ) as $weekly_meal_id ) {
 				$weekly_meal_id = absint( $weekly_meal_id );
 
 				if ( $weekly_meal_id > 0 ) {
@@ -1346,7 +1443,7 @@ class Public_Module extends Abstract_Module {
 		$delivery_time  = isset( $_POST['delivery_time'] ) ? sanitize_text_field( wp_unslash( $_POST['delivery_time'] ) ) : 'morning';
 
 		if ( ! in_array( $plan_type, array( 'individual', 'family' ), true ) ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Please choose a valid plan type.', 'restaurant-food-services' ) ), 400 );
+			$plan_type = 'individual';
 		}
 
 		if ( $meals_per_week <= 0 ) {
@@ -1397,7 +1494,9 @@ class Public_Module extends Abstract_Module {
 		$order_signature = md5(
 			wp_json_encode(
 				array(
+					'weekly_menu_id' => $weekly_menu_id,
 					'plan_type'      => $plan_type,
+					'family_size'    => $family_size,
 					'meals_per_week' => $meals_per_week,
 					'selected_meals' => $selected_meals,
 					'delivery_time'  => $delivery_time,
@@ -1490,7 +1589,9 @@ class Public_Module extends Abstract_Module {
 		}
 
 		$selection = array(
+			'weekly_menu_id'         => $weekly_menu_id,
 			'plan_type'              => $plan_type,
+			'family_size'            => $family_size,
 			'meals_per_week'         => $meals_per_week,
 			'selected_meals'         => $valid_products,
 			'delivery_location_data' => $location_data,
@@ -1509,6 +1610,8 @@ class Public_Module extends Abstract_Module {
 		$order->update_meta_data( 'delivery_location_longitude', $location_data['longitude'] );
 		$order->update_meta_data( 'meals_per_week', $meals_per_week );
 		$order->update_meta_data( 'plan_type', $plan_type );
+		$order->update_meta_data( 'family_size', $family_size );
+		$order->update_meta_data( 'weekly_menu_id', $weekly_menu_id );
 		$order->calculate_totals();
 		$order->save();
 
@@ -1597,6 +1700,7 @@ class Public_Module extends Abstract_Module {
 		$order->update_meta_data( 'delivery_location_longitude', $location_data['longitude'] );
 		$order->update_meta_data( 'meals_per_week', isset( $selection['meals_per_week'] ) ? absint( $selection['meals_per_week'] ) : 0 );
 		$order->update_meta_data( 'plan_type', isset( $selection['plan_type'] ) ? sanitize_text_field( $selection['plan_type'] ) : 'individual' );
+		$order->update_meta_data( 'weekly_menu_id', isset( $selection['weekly_menu_id'] ) ? absint( $selection['weekly_menu_id'] ) : 0 );
 
 		WC()->session->__unset( 'restaurant_meal_plan_selection' );
 	}

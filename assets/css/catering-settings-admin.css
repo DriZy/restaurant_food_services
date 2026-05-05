@@ -89,3 +89,131 @@
 	margin-top: 12px;
 }
 
+/* Catering Chat Styles for Admin Meta Box */
+.restaurant-catering-chat {
+	border: 1px solid #ccd0d4;
+	border-radius: 4px;
+	padding: 15px;
+	background: #fff;
+	margin: 10px 0;
+}
+
+.restaurant-catering-chat h4 {
+	margin: 0 0 15px;
+	font-size: 16px;
+	border-bottom: 1px solid #eee;
+	padding-bottom: 10px;
+}
+
+.restaurant-catering-chat-messages {
+	max-height: 400px;
+	overflow-y: auto;
+	border: 1px solid #e5e5e5;
+	border-radius: 3px;
+	padding: 12px;
+	background: #f9f9f9;
+	margin-bottom: 15px;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.restaurant-catering-chat-message {
+	padding: 10px 12px;
+	border-radius: 6px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	max-width: 85%;
+	position: relative;
+}
+
+.restaurant-catering-chat-message header {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	font-size: 11px;
+	color: #646970;
+	margin-bottom: 6px;
+	border-bottom: 1px solid #f0f0f1;
+	padding-bottom: 4px;
+}
+
+.restaurant-catering-chat-message__body {
+	line-height: 1.5;
+	font-size: 13px;
+	color: #2c3338;
+}
+
+.restaurant-catering-chat-message__body p {
+	margin: 0 0 8px;
+}
+
+.restaurant-catering-chat-message__body p:last-child {
+	margin-bottom: 0;
+}
+
+/* Admin Message (Self) */
+.restaurant-catering-chat-message--admin {
+	align-self: flex-end;
+	border-right: 3px solid #2ea44f;
+	background-color: #f0f6f1;
+	text-align: right;
+}
+
+.restaurant-catering-chat-message--admin header {
+	flex-direction: row-reverse;
+}
+
+/* User Message (Customer) */
+.restaurant-catering-chat-message--owner {
+	align-self: flex-start;
+	border-left: 3px solid #2271b1;
+	background-color: #fff;
+}
+
+.restaurant-catering-chat-form-field textarea {
+	width: 100%;
+	border: 1px solid #8c8f94;
+	border-radius: 3px;
+	padding: 8px;
+	font-family: inherit;
+	resize: vertical;
+}
+
+.restaurant-catering-chat-form-field textarea:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: none;
+}
+
+.restaurant-catering-chat-form-submit {
+	margin: 10px 0 0;
+	text-align: right;
+}
+
+.restaurant-catering-chat-empty {
+	text-align: center;
+	color: #646970;
+	font-style: italic;
+	margin: 20px 0;
+}
+
+.restaurant-catering-chat-notification {
+	padding: 10px 12px;
+	margin-bottom: 10px;
+	border-radius: 3px;
+	font-size: 13px;
+}
+
+.restaurant-catering-chat-notification--success {
+	background-color: #edfaef;
+	border: 1px solid #00a32a;
+	color: #007017;
+}
+
+.restaurant-catering-chat-notification--error {
+	background-color: #fcf0f1;
+	border: 1px solid #d63638;
+	color: #d63638;
+}
+

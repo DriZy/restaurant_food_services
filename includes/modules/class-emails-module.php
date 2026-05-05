@@ -39,6 +39,7 @@ class Emails_Module extends Abstract_Module {
 		$loader->add_action( 'restaurant_food_services_subscription_created', $this, 'send_subscription_created_email' );
 		$loader->add_action( 'restaurant_food_services_catering_request_submitted', $this, 'send_catering_request_submitted_email' );
 		$loader->add_action( 'restaurant_food_services_catering_approved', $this, 'send_catering_approved_email' );
+		$loader->add_action( 'restaurant_food_services_catering_chat_message_sent', $this, 'send_catering_chat_notification_email', 10, 2 );
 		$loader->add_filter( 'woocommerce_email_recipient_new_order', $this, 'filter_admin_email_recipient', 10, 2 );
 		$loader->add_filter( 'woocommerce_email_recipient_cancelled_order', $this, 'filter_admin_email_recipient', 10, 2 );
 		$loader->add_filter( 'woocommerce_email_recipient_failed_order', $this, 'filter_admin_email_recipient', 10, 2 );
@@ -162,6 +163,91 @@ class Emails_Module extends Abstract_Module {
 		}
 
 		$this->send_catering_request_submitted_fallback_email( $catering_data );
+	}
+
+	/**
+	 * Sends a notification email when a new catering chat message is sent.
+	 *
+	 * @param int $comment_id  Comment post ID.
+	 * @param int $catering_id Catering request ID.
+	 *
+	 * @return void
+	 */
+	public function send_catering_chat_notification_email( $comment_id, $catering_id ) {
+		$comment  = get_comment( $comment_id );
+		$catering = get_post( $catering_id );
+
+		if ( ! $comment || ! $catering ) {
+			return;
+		}
+
+		$author_id      = (int) $comment->user_id;
+		$catering_owner = (int) $catering->post_author;
+		$is_admin_msg   = user_can( $author_id, 'manage_options' );
+		
+		$recipient = '';
+		$subject   = '';
+		$title     = '';
+
+		if ( $is_admin_msg ) {
+			// Message from admin, notify customer
+			$user = get_user_by( 'id', $catering_owner );
+			if ( $user ) {
+				$recipient = $user->user_email;
+				$subject   = sprintf( __( 'New message from %s regarding your catering request', 'restaurant-food-services' ), get_bloginfo( 'name' ) );
+				$title     = __( 'New Message from Shop Owner', 'restaurant-food-services' );
+			}
+		} else {
+			// Message from customer, notify shop owner
+			$recipient = sanitize_email( (string) get_option( 'restaurant_admin_notification_email', get_option( 'admin_email' ) ) );
+			$subject   = sprintf( __( 'New message from customer regarding Catering Request #%d', 'restaurant-food-services' ), absint( $catering_id ) );
+			$title     = __( 'New Message from Customer', 'restaurant-food-services' );
+		}
+
+		if ( empty( $recipient ) ) {
+			return;
+		}
+
+		$logo_id   = get_theme_mod( 'custom_logo' );
+		$logo_html = '';
+
+		if ( $logo_id ) {
+			$logo_src = wp_get_attachment_image_src( $logo_id, 'full' );
+			if ( $logo_src ) {
+				$logo_html = sprintf(
+					'<div style="margin-bottom: 25px;"><img src="%s" alt="%s" style="max-width: 150px; height: auto;"></div>',
+					esc_url( $logo_src[0] ),
+					esc_attr( get_bloginfo( 'name' ) )
+				);
+			}
+		}
+
+		$my_account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/my-account/' );
+		$chat_url       = add_query_arg( 'catering_request', $catering_id, trailingslashit( $my_account_url ) . 'my-catering-requests' );
+		
+		if ( ! $is_admin_msg ) {
+			$chat_url = admin_url( 'post.php?post=' . absint( $catering_id ) . '&action=edit' );
+		}
+
+		$message  = '<div style="font-family:Arial,sans-serif;line-height:1.6;color:#333;max-width:600px;margin:0 auto;padding:20px;border:1px solid #eee;border-radius:8px;">';
+		$message .= $logo_html;
+		$message .= '<h2 style="color:#1a1a1b;border-bottom:2px solid #fbb03b;padding-bottom:10px;margin-top:0;">' . esc_html( $title ) . '</h2>';
+		$message .= '<p>' . sprintf( esc_html__( 'You have received a new message regarding catering request #%d:', 'restaurant-food-services' ), absint( $catering_id ) ) . '</p>';
+		$message .= '<div style="background:#f9f9f9;padding:15px;border-radius:4px;border-left:4px solid #fbb03b;margin:20px 0;font-style:italic;">';
+		$message .= wp_kses_post( wpautop( $comment->comment_content ) );
+		$message .= '</div>';
+		$message .= '<p style="margin-top:25px;text-align:center;">';
+		$message .= '<a href="' . esc_url( $chat_url ) . '" style="display:inline-block;padding:12px 30px;background:#fbb03b;color:#fff;text-decoration:none;border-radius:4px;font-weight:bold;box-shadow:0 2px 4px rgba(0,0,0,0.1);">' . esc_html__( 'View Discussion', 'restaurant-food-services' ) . '</a>';
+		$message .= '</p>';
+		$message .= '<p style="font-size:12px;color:#999;margin-top:30px;border-top:1px solid #eee;padding-top:10px;">' . sprintf( esc_html__( 'This is an automated notification from %s.', 'restaurant-food-services' ), get_bloginfo( 'name' ) ) . '</p>';
+		$message .= '</div>';
+
+		wp_mail(
+			$recipient,
+			$subject,
+			$message,
+			array( 'Content-Type: text/html; charset=UTF-8' )
+		);
 	}
 
 	/**

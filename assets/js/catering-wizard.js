@@ -15,8 +15,15 @@
 		if (!$el || !$el.length) {
 			return;
 		}
-		$el.addClass('has-error');
-		$el.last().after($('<p class="restaurant-field-error" />').text(message));
+
+		var $card = $el.closest('.restaurant-wizard-field-card');
+		if ($card.length) {
+			$card.addClass('has-error');
+			$card.append($('<p class="restaurant-field-error" />').text(message));
+		} else {
+			$el.addClass('has-error');
+			$el.last().after($('<p class="restaurant-field-error" />').text(message));
+		}
 	}
 
 	function isFutureDate(dateStr) {
@@ -179,7 +186,10 @@
 	};
 
 	CateringWizard.prototype.applyStateToForm = function () {
-		this.$root.find('[name="event_type"]').val(this.state.eventType).trigger('change');
+		var self = this;
+		var eventType = (this.state.eventType || '').toString();
+		this.$root.find('[name="event_type"]').val(eventType);
+
 		this.$root.find('[name="event_date"]').val(this.state.eventDate);
 		this.$root.find('[name="guest_count"]').val(this.state.guestCount > 0 ? this.state.guestCount : '');
 		this.$root.find('[name="location"]').val(this.state.location);
@@ -287,11 +297,13 @@
 			}
 			self.currentStep = Math.min(4, self.currentStep + 1);
 			self.syncUI();
+			self.scrollToTop();
 		});
 
 		this.$prev.on('click', function () {
 			self.currentStep = Math.max(1, self.currentStep - 1);
 			self.syncUI();
+			self.scrollToTop();
 		});
 
 		this.$saveDraft.on('click', function () {
@@ -301,6 +313,13 @@
 		this.$submit.on('click', function () {
 			self.submit();
 		});
+	};
+
+	CateringWizard.prototype.scrollToTop = function () {
+		var offset = this.$root.offset().top - 100;
+		$('html, body').animate({
+			scrollTop: offset
+		}, 300);
 	};
 
 	CateringWizard.prototype.schedulePricePreview = function () {
@@ -368,7 +387,7 @@
 			var address = escapeHtml(item.formatted_address.toString());
 			var lat = escapeHtml((item.latitude || '').toString());
 			var lng = escapeHtml((item.longitude || '').toString());
-			html += '<li><button type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</button></li>';
+			html += '<li><a type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</a></li>';
 		});
 		html += '</ul>';
 
@@ -451,6 +470,7 @@
 	CateringWizard.prototype.validateStep = function (step) {
 		this.$root.find('.restaurant-field-error').remove();
 		this.$root.find('.has-error').removeClass('has-error');
+		this.$root.find('.restaurant-wizard-field-card').removeClass('has-error');
 
 		if (step === 1) {
 			if (!this.state.eventType || !this.state.eventDate || this.state.guestCount <= 0 || !this.state.location) {

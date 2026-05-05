@@ -171,6 +171,7 @@ class Subscriptions_Module extends Abstract_Module {
 			return;
 		}
 
+		$weekly_menu_id = isset( $selection['weekly_menu_id'] ) ? absint( $selection['weekly_menu_id'] ) : 0;
 		$selected_meals = isset( $selection['selected_meals'] ) && is_array( $selection['selected_meals'] ) ? array_map( 'absint', $selection['selected_meals'] ) : array();
 		$delivery_days  = $this->normalize_delivery_days_to_sunday( isset( $selection['delivery_days'] ) && is_array( $selection['delivery_days'] ) ? array_map( 'sanitize_text_field', $selection['delivery_days'] ) : array() );
 		$meals_per_week = isset( $selection['meals_per_week'] ) ? absint( $selection['meals_per_week'] ) : 0;
@@ -196,6 +197,7 @@ class Subscriptions_Module extends Abstract_Module {
 			array(
 				'user_id'         => $user_id,
 				'plan_id'         => 0,
+				'weekly_menu_id'  => $weekly_menu_id,
 				'plan_type'       => $plan_type,
 				'meals_per_week'  => $meals_per_week,
 				'selected_meals'  => wp_json_encode( $selected_meals ),
@@ -205,7 +207,7 @@ class Subscriptions_Module extends Abstract_Module {
 				'next_order_date' => $this->extract_next_order_date( $order ),
 				'created_at'      => current_time( 'mysql', true ),
 			),
-			array( '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%d', '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false !== $inserted && $wpdb->insert_id > 0 ) {
@@ -235,6 +237,30 @@ class Subscriptions_Module extends Abstract_Module {
 		}
 
 		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN plan_type varchar(50) NOT NULL DEFAULT 'individual' AFTER plan_id" );
+	}
+
+	/**
+	 * Ensures the subscriptions table includes weekly_menu_id column.
+	 *
+	 * @param string $table_name Subscriptions table name.
+	 *
+	 * @return void
+	 */
+	protected function maybe_add_weekly_menu_id_column( $table_name ) {
+		global $wpdb;
+
+		$column = $wpdb->get_var(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM {$table_name} LIKE %s",
+				'weekly_menu_id'
+			)
+		);
+
+		if ( ! empty( $column ) ) {
+			return;
+		}
+
+		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN weekly_menu_id bigint(20) unsigned NOT NULL DEFAULT 0 AFTER plan_id" );
 	}
 
 	/**
@@ -899,6 +925,11 @@ class Subscriptions_Module extends Abstract_Module {
 				<input type="hidden" name="restaurant_weekly_menu_action" value="create">
 
 				<p>
+					<label for="restaurant_menu_name"><strong><?php esc_html_e( 'Plan Name', 'restaurant-food-services' ); ?></strong></label><br>
+					<input type="text" id="restaurant_menu_name" name="menu_name" placeholder="<?php esc_attr_e( 'e.g. Standard Plan, Keto Plan...', 'restaurant-food-services' ); ?>" style="min-width:360px;" required>
+				</p>
+
+				<p>
 					<label for="restaurant_week_start"><strong><?php esc_html_e( 'Week Start', 'restaurant-food-services' ); ?></strong></label><br>
 					<input type="date" id="restaurant_week_start" name="week_start" required>
 				</p>
@@ -927,6 +958,7 @@ class Subscriptions_Module extends Abstract_Module {
 				<thead>
 					<tr>
 						<th><?php esc_html_e( 'ID', 'restaurant-food-services' ); ?></th>
+						<th><?php esc_html_e( 'Plan Name', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Week Start', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Week End', 'restaurant-food-services' ); ?></th>
 						<th><?php esc_html_e( 'Meals Count', 'restaurant-food-services' ); ?></th>
@@ -936,13 +968,14 @@ class Subscriptions_Module extends Abstract_Module {
 				<tbody>
 					<?php if ( empty( $menus ) ) : ?>
 						<tr>
-							<td colspan="5"><?php esc_html_e( 'No weekly menus created yet.', 'restaurant-food-services' ); ?></td>
+							<td colspan="6"><?php esc_html_e( 'No weekly menus created yet.', 'restaurant-food-services' ); ?></td>
 						</tr>
 					<?php else : ?>
 						<?php foreach ( $menus as $menu ) : ?>
 							<?php $meals = $this->decode_json_array( $menu->meals ); ?>
 							<tr>
 								<td><?php echo esc_html( (string) $menu->id ); ?></td>
+								<td><strong><?php echo esc_html( ! empty( $menu->menu_name ) ? $menu->menu_name : __( 'Unnamed Plan', 'restaurant-food-services' ) ); ?></strong></td>
 								<td><?php echo esc_html( (string) $menu->week_start ); ?></td>
 								<td><?php echo esc_html( (string) $menu->week_end ); ?></td>
 								<td><?php echo esc_html( (string) count( $meals ) ); ?></td>
@@ -993,9 +1026,15 @@ class Subscriptions_Module extends Abstract_Module {
 			return;
 		}
 
+		$menu_name  = isset( $_POST['menu_name'] ) ? sanitize_text_field( wp_unslash( $_POST['menu_name'] ) ) : '';
 		$week_start = isset( $_POST['week_start'] ) ? sanitize_text_field( wp_unslash( $_POST['week_start'] ) ) : '';
 		$week_end   = isset( $_POST['week_end'] ) ? sanitize_text_field( wp_unslash( $_POST['week_end'] ) ) : '';
 		$meal_ids   = isset( $_POST['meals'] ) ? array_values( array_unique( array_filter( array_map( 'absint', (array) wp_unslash( $_POST['meals'] ) ) ) ) ) : array();
+
+		if ( empty( $menu_name ) ) {
+			add_settings_error( 'restaurant_weekly_meal_menu', 'weekly_menu_no_name', esc_html__( 'Please provide a plan name.', 'restaurant-food-services' ), 'error' );
+			return;
+		}
 
 		if ( ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $week_start ) || ! preg_match( '/^\d{4}-\d{2}-\d{2}$/', $week_end ) ) {
 			add_settings_error( 'restaurant_weekly_meal_menu', 'weekly_menu_invalid_dates', esc_html__( 'Please provide valid week start and week end dates.', 'restaurant-food-services' ), 'error' );
@@ -1014,26 +1053,28 @@ class Subscriptions_Module extends Abstract_Module {
 
 		$overlap_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
-				"SELECT COUNT(*) FROM {$table_name} WHERE NOT (week_end < %s OR week_start > %s)",
+				"SELECT COUNT(*) FROM {$table_name} WHERE menu_name = %s AND NOT (week_end < %s OR week_start > %s)",
+				$menu_name,
 				$week_start,
 				$week_end
 			)
 		);
 
 		if ( $overlap_count > 0 ) {
-			add_settings_error( 'restaurant_weekly_meal_menu', 'weekly_menu_overlap', esc_html__( 'A weekly menu already exists for this date range. Only one active menu per week is allowed.', 'restaurant-food-services' ), 'error' );
+			add_settings_error( 'restaurant_weekly_meal_menu', 'weekly_menu_overlap', esc_html__( 'A weekly menu with this name already exists for this date range.', 'restaurant-food-services' ), 'error' );
 			return;
 		}
 
 		$inserted = $wpdb->insert(
 			$table_name,
 			array(
+				'menu_name'  => $menu_name,
 				'week_start' => $week_start,
 				'week_end'   => $week_end,
 				'meals'      => wp_json_encode( $meal_ids ),
 				'created_at' => current_time( 'mysql', true ),
 			),
-			array( '%s', '%s', '%s', '%s' )
+			array( '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false === $inserted ) {
@@ -1054,17 +1095,15 @@ class Subscriptions_Module extends Abstract_Module {
 
 		$table_name = $wpdb->prefix . 'restaurant_weekly_menus';
 
-		$found = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) );
-
-		if ( is_string( $found ) && $found === $table_name ) {
-			return;
-		}
+		// Check if table exists and has the menu_name column
+		$column_exists = $wpdb->get_results( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'menu_name' ) );
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
 		$charset_collate = $wpdb->get_charset_collate();
 		$sql             = "CREATE TABLE {$table_name} (
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+			menu_name varchar(255) DEFAULT '',
 			week_start date NOT NULL,
 			week_end date NOT NULL,
 			meals longtext NULL,
@@ -1075,6 +1114,16 @@ class Subscriptions_Module extends Abstract_Module {
 		) {$charset_collate};";
 
 		dbDelta( $sql );
+
+		// If it's an existing table but menu_name was just added by dbDelta, it might not be enough if dbDelta fails.
+		// dbDelta is usually good but let's be safe.
+		if ( empty( $column_exists ) ) {
+			// Double check if it was actually added
+			$column_exists_now = $wpdb->get_results( $wpdb->prepare( 'SHOW COLUMNS FROM %i LIKE %s', $table_name, 'menu_name' ) );
+			if ( empty( $column_exists_now ) ) {
+				$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN menu_name varchar(255) DEFAULT '' AFTER id" );
+			}
+		}
 	}
 
 	/**
@@ -1192,15 +1241,24 @@ class Subscriptions_Module extends Abstract_Module {
 						<?php foreach ( $subscriptions as $sub ) : ?>
 							<?php
 							$user = get_user_by( 'id', $sub->user_id );
-							$product = wc_get_product( $sub->plan_id );
 							$user_name = $user ? $user->display_name : esc_html__( 'Unknown', 'restaurant-food-services' );
-							$product_name = $product ? $product->get_name() : esc_html__( 'Unknown', 'restaurant-food-services' );
+							
+							$plan_name = '';
+							if ( ! empty( $sub->weekly_menu_id ) ) {
+								$table_menus = $wpdb->prefix . 'restaurant_weekly_menus';
+								$plan_name = $wpdb->get_var( $wpdb->prepare( "SELECT menu_name FROM {$table_menus} WHERE id = %d", $sub->weekly_menu_id ) );
+							}
+							if ( empty( $plan_name ) ) {
+								$product = wc_get_product( $sub->plan_id );
+								$plan_name = $product ? $product->get_name() : esc_html__( 'Generic Plan', 'restaurant-food-services' );
+							}
+
 							$status_label = $this->get_subscription_status_label( $sub->status );
 							?>
 							<tr>
 								<td><?php echo esc_html( $sub->id ); ?></td>
 								<td><?php echo esc_html( $user_name ); ?></td>
-								<td><?php echo esc_html( $product_name ); ?></td>
+								<td><strong><?php echo esc_html( $plan_name ); ?></strong></td>
 								<td><?php echo esc_html( $sub->meals_per_week ); ?></td>
 								<td><?php echo esc_html( $status_label ); ?></td>
 								<td><?php echo esc_html( $sub->next_order_date ); ?></td>
@@ -1226,6 +1284,7 @@ class Subscriptions_Module extends Abstract_Module {
 
 		if ( $this->subscriptions_table_exists( $table_name ) ) {
 			$this->maybe_add_plan_type_column( $table_name );
+			$this->maybe_add_weekly_menu_id_column( $table_name );
 			$this->maybe_add_location_data_column( $table_name );
 			return;
 		}
@@ -1237,6 +1296,7 @@ class Subscriptions_Module extends Abstract_Module {
 			id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 			user_id bigint(20) unsigned NOT NULL,
 			plan_id bigint(20) unsigned NOT NULL,
+			weekly_menu_id bigint(20) unsigned NOT NULL DEFAULT 0,
 			plan_type varchar(50) NOT NULL DEFAULT 'individual',
 			meals_per_week int(11) unsigned NOT NULL DEFAULT 0,
 			selected_meals longtext NULL,

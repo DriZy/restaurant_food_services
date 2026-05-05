@@ -30,9 +30,16 @@
 		if (!$el || !$el.length) {
 			return;
 		}
-		var $error = $('<p class="restaurant-field-error" />').text(message);
-		$el.addClass('has-error');
-		$el.last().after($error);
+		
+		var $card = $el.closest('.restaurant-wizard-field-card');
+		if ($card.length) {
+			$card.addClass('has-error');
+			$card.append($('<p class="restaurant-field-error" />').text(message));
+		} else {
+			var $error = $('<p class="restaurant-field-error" />').text(message);
+			$el.addClass('has-error');
+			$el.last().after($error);
+		}
 	}
 
 
@@ -40,7 +47,8 @@
 		this.$root = $root;
 		this.currentStep = 1;
 		this.state = {
-			planType: '',
+			planType: 'individual',
+			familySize: 1,
 			mealsPerWeek: 0,
 			selectedMeals: [],
 			deliveryLocation: {
@@ -63,6 +71,7 @@
 		this.$locationLatitude = this.$root.find('input[name="delivery_latitude"]');
 		this.$locationLongitude = this.$root.find('input[name="delivery_longitude"]');
 		this.$locationSuggestions = this.$root.find('.restaurant-location-suggestions');
+		this.$familySizeField = this.$root.find('.restaurant-family-size-field');
 		this.summarySidebar = null;
 		this.locationSearchTimer = null;
 		this.locationRequest = null;
@@ -93,7 +102,8 @@
 	MealPlansWizard.prototype.reset = function () {
 		this.currentStep = 1;
 		this.state = {
-			planType: '',
+			planType: 'individual',
+			familySize: 1,
 			mealsPerWeek: 0,
 			selectedMeals: [],
 			deliveryLocation: {
@@ -106,12 +116,15 @@
 		};
 
 		this.$root.find('input[type="radio"], input[type="checkbox"]').prop('checked', false);
+		this.$root.find('input[value="individual"]').prop('checked', true);
 		this.$root.find('input[type="text"], input[type="number"], input[type="hidden"], textarea').val('');
 		this.$root.find('select').val('');
+		this.$root.find('#family_size').val(2);
 		this.$root.find('.restaurant-meal-plan-quantity').val(0);
 		this.$root.find('.restaurant-field-error').remove();
 		this.$root.find('.has-error').removeClass('has-error');
 
+		this.toggleFamilySizeField();
 		this.updateSidebar();
 	};
 
@@ -119,11 +132,19 @@
 		var self = this;
 
 		this.$root.on('change', 'input[name="plan_type"]', function () {
-			self.state.planType = ($(this).val() || '').toString();
+			self.state.planType = ($(this).val() || 'individual').toString();
+			self.toggleFamilySizeField();
+			self.updateSidebar();
+		});
+
+		this.$root.on('change input', 'input[name="family_size"]', function () {
+			self.state.familySize = parseInt($(this).val(), 10) || 1;
+			self.updateSidebar();
 		});
 
 		this.$root.on('change', 'select[name="meals_per_week"]', function () {
 			self.state.mealsPerWeek = parseInt($(this).val(), 10) || 0;
+			self.updateSidebar();
 		});
 
 		this.$root.on('change input', '.restaurant-meal-plan-quantity', function () {
@@ -188,10 +209,6 @@
 			self.updateSidebar();
 		});
 
-		this.$root.on('change', 'select[name="meals_per_week"]', function () {
-			self.updateSidebar();
-		});
-
 		this.$next.on('click', function () {
 			if (!self.validateStep(self.currentStep)) {
 				return;
@@ -199,11 +216,13 @@
 
 			self.currentStep = Math.min(5, self.currentStep + 1);
 			self.syncUI();
+			self.scrollToTop();
 		});
 
 		this.$prev.on('click', function () {
 			self.currentStep = Math.max(1, self.currentStep - 1);
 			self.syncUI();
+			self.scrollToTop();
 		});
 
 		this.$submit.on('click', function () {
@@ -211,14 +230,39 @@
 		});
 	};
 
+	MealPlansWizard.prototype.toggleFamilySizeField = function () {
+		if (this.state.planType === 'family') {
+			this.$familySizeField.show();
+			this.state.familySize = parseInt(this.$root.find('input[name="family_size"]').val(), 10) || 2;
+		} else {
+			this.$familySizeField.hide();
+			this.state.familySize = 1;
+		}
+	};
+
+	MealPlansWizard.prototype.scrollToTop = function () {
+		var offset = this.$root.offset().top - 100;
+		$('html, body').animate({
+			scrollTop: offset
+		}, 300);
+	};
+
 	MealPlansWizard.prototype.validateStep = function (step) {
 		this.$root.find('.restaurant-field-error').remove();
 		this.$root.find('.has-error').removeClass('has-error');
+		this.$root.find('.restaurant-wizard-field-card').removeClass('has-error');
 
-		if (step === 1 && !this.state.planType) {
-			setInlineError(this.$root.find('input[name="plan_type"]').last().closest('label'), 'Please choose a plan type.');
-			notify('Please choose a plan type.', 'error');
-			return false;
+		if (step === 1) {
+			if (!this.state.planType) {
+				setInlineError(this.$root.find('input[name="plan_type"]').last().closest('label'), 'Please choose a plan type.');
+				notify('Please choose a plan type.', 'error');
+				return false;
+			}
+			if (this.state.planType === 'family' && (this.state.familySize < 2 || Number.isNaN(this.state.familySize))) {
+				setInlineError(this.$root.find('input[name="family_size"]'), 'Family size must be at least 2.');
+				notify('Family size must be at least 2.', 'error');
+				return false;
+			}
 		}
 
 		if (step === 2 && this.state.mealsPerWeek <= 0) {
@@ -232,7 +276,7 @@
 		}
 
 		if (step === 3 && this.state.selectedMeals.length === 0) {
-			setInlineError(this.$root.find('.restaurant-meals-grid').first(), 'Please enter quantity for at least one meal.');
+			setInlineError(this.$root.find('.restaurant-meal-plan-meals-list').first(), 'Please enter quantity for at least one meal.');
 			notify('Please enter quantity for at least one meal.', 'error');
 			return false;
 		}
@@ -310,7 +354,7 @@
 			var address = escapeHtml(item.formatted_address.toString());
 			var lat = escapeHtml((item.latitude || '').toString());
 			var lng = escapeHtml((item.longitude || '').toString());
-			html += '<li><button type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</button></li>';
+			html += '<li><a type="button" class="restaurant-location-suggestion" data-address="' + address + '" data-lat="' + lat + '" data-lng="' + lng + '">' + address + '</a></li>';
 		});
 		html += '</ul>';
 
@@ -391,11 +435,13 @@
 			}).join('') + '</div>';
 		}
 
+		var planTypeLabel = this.state.planType === 'family' ? 'Family (' + this.state.familySize + ' persons)' : 'Individual';
+
 		var html = '';
 		html += '<section class="restaurant-summary-panel">';
 		html += '<h4>Meal Plan Summary</h4>';
 		html += '<div class="restaurant-summary-grid">';
-		html += '<article class="restaurant-summary-item"><strong>Plan Type</strong><span>' + escapeHtml(this.state.planType || '-') + '</span></article>';
+		html += '<article class="restaurant-summary-item"><strong>Plan Type</strong><span>' + escapeHtml(planTypeLabel) + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Meals Per Week</strong><span>' + escapeHtml((this.state.mealsPerWeek || '-').toString()) + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Delivery Location</strong><span>' + escapeHtml(this.state.deliveryLocation.formattedAddress || '-') + '</span></article>';
 		html += '<article class="restaurant-summary-item"><strong>Delivery Days</strong><span>' + escapeHtml(this.state.deliveryDays.join(', ') || '-') + '</span></article>';
@@ -436,25 +482,25 @@
 
 		if (!this.validateStep(1)) {
 			this.currentStep = 1;
-			this.syncUI();
+			self.syncUI();
 			return;
 		}
 
 		if (!this.validateStep(2)) {
 			this.currentStep = 2;
-			this.syncUI();
+			self.syncUI();
 			return;
 		}
 
 		if (!this.validateStep(3)) {
 			this.currentStep = 3;
-			this.syncUI();
+			self.syncUI();
 			return;
 		}
 
 		if (!this.validateStep(4)) {
 			this.currentStep = 4;
-			this.syncUI();
+			self.syncUI();
 			return;
 		}
 
@@ -475,6 +521,7 @@
 				action: 'restaurant_submit_meal_plan_selection',
 				nonce: cfg.mealPlanSubmitNonce,
 				plan_type: this.state.planType,
+				family_size: this.state.familySize,
 				meals_per_week: this.state.mealsPerWeek,
 				selected_meals: this.state.selectedMeals,
 				delivery_location: this.state.deliveryLocation.formattedAddress,

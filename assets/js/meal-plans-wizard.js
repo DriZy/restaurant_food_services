@@ -66,6 +66,8 @@
 		this.$prev = this.$root.find('.restaurant-wizard-prev');
 		this.$submit = this.$root.find('.restaurant-wizard-submit');
 		this.$summary = this.$root.find('.restaurant-wizard-summary');
+		this.$submissionStatus = this.$root.find('.restaurant-wizard-submission-status');
+		this.$submissionMessage = this.$root.find('.restaurant-wizard-submission-message');
 		this.$sidebar = this.$root.find('[data-summary-sidebar="meal-plans"]');
 		this.$locationInput = this.$root.find('input[name="delivery_location"]');
 		this.$locationLatitude = this.$root.find('input[name="delivery_latitude"]');
@@ -488,7 +490,33 @@
 		return selectedMeals;
 	};
 
-	MealPlansWizard.prototype.submit = function () {
+	MealPlansWizard.prototype.showSubmissionStatus = function (message, type, autoDismiss) {
+		var $status = this.$submissionStatus;
+		var $messageSpan = this.$submissionMessage;
+
+		if (!$status.length) {
+			return;
+		}
+
+		if (this.statusDismissTimer) {
+			clearTimeout(this.statusDismissTimer);
+		}
+
+		$messageSpan.text(message);
+		$status
+			.removeClass('is-success is-error is-loading')
+			.addClass('is-' + type)
+			.stop(true, true)
+			.show();
+
+		if (autoDismiss && type !== 'loading') {
+			this.statusDismissTimer = setTimeout(function () {
+				$status.fadeOut(500);
+			}, autoDismiss);
+		}
+	};
+
+	MealPlansWizard.prototype.submit = function (e) {
 		var self = this;
 		var cfg = window.RestaurantFoodServicesPublic || {};
 
@@ -524,6 +552,7 @@
 		this.state.selectedMeals = this.collectSelectedMeals();
 
 		this.$submit.prop('disabled', true).addClass('loading');
+		this.showSubmissionStatus('Submitting your meal plan...', 'loading');
 
 		$.ajax({
 			url: cfg.ajaxUrl,
@@ -545,10 +574,13 @@
 		})
 			.done(function (response) {
 				if (response && response.success) {
+					var message = (response.data && response.data.message) ? response.data.message : 'Meal plan saved successfully.';
+					self.showSubmissionStatus(message, 'success', 3000);
+					notify(message, 'success');
+					
 					if (response.data && typeof response.data.cart_count !== 'undefined') {
 						setCartCount(response.data.cart_count);
 					}
-					notify((response.data && response.data.message) ? response.data.message : 'Meal plan saved.', 'success');
 					
 					var checkoutUrl = response.data && response.data.checkout_url;
 					
@@ -556,15 +588,20 @@
 					self.syncUI();
 
 					if (checkoutUrl) {
-						window.location.href = checkoutUrl;
+						setTimeout(function() {
+							window.location.href = checkoutUrl;
+						}, 2000);
 					}
 					return;
 				}
-
-				notify((response && response.data && response.data.message) ? response.data.message : 'Unable to submit meal plan.', 'error');
+				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Unable to submit meal plan.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.fail(function () {
-				notify('Unable to submit meal plan right now.', 'error');
+				var errorMsg = 'Unable to submit meal plan right now. Please check your connection.';
+				self.showSubmissionStatus(errorMsg, 'error', 5000);
+				notify(errorMsg, 'error');
 			})
 			.always(function () {
 				self.$submit.prop('disabled', false).removeClass('loading');

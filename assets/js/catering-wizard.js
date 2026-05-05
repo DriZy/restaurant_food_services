@@ -665,14 +665,15 @@
 		// Update message and type
 		$messageSpan.text(message);
 		$status
-			.removeClass('is-success is-error')
+			.removeClass('is-success is-error is-loading')
 			.addClass('is-' + type)
+			.stop(true, true)
 			.show();
 
 		// Auto-dismiss after specified time (in ms)
 		if (autoDismiss && type !== 'loading') {
 			this.statusDismissTimer = setTimeout(function () {
-				$status.fadeOut(300);
+				$status.fadeOut(500);
 			}, autoDismiss);
 		}
 	};

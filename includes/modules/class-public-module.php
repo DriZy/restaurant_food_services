@@ -337,14 +337,15 @@ class Public_Module extends Abstract_Module {
 		echo '<section class="restaurant-wizard-panel" data-step="4">';
 		echo '<h3>' . esc_html__( 'Step 4: Summary', 'restaurant-food-services' ) . '</h3>';
 		echo '<div class="restaurant-wizard-summary"></div>';
-		echo '<div class="restaurant-wizard-submission-status" style="display: none; margin: 15px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #0073aa;">';
-		echo '<span class="restaurant-wizard-submission-spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #0073aa; border-radius: 50%; animation: restaurant-spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle;"></span>';
-		echo '<span class="restaurant-wizard-submission-message"></span>';
-		echo '</div>';
 		echo '<button type="button" class="button restaurant-catering-save-draft">' . esc_html__( 'Save Draft', 'restaurant-food-services' ) . '</button> ';
 		echo '<button type="button" class="button button-primary restaurant-catering-submit">' . esc_html__( 'Submit Catering Request', 'restaurant-food-services' ) . '</button>';
 		echo '</section>';
 
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-submission-status" style="display: none; margin: 15px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #0073aa; background: #f9f9f9;">';
+		echo '<span class="restaurant-wizard-submission-spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #0073aa; border-radius: 50%; animation: restaurant-spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle;"></span>';
+		echo '<span class="restaurant-wizard-submission-message"></span>';
 		echo '</div>';
 
 		echo '<div class="restaurant-wizard-actions">';
@@ -496,6 +497,11 @@ class Public_Module extends Abstract_Module {
 		echo '<div class="restaurant-wizard-summary"></div>';
 		echo '<button type="button" class="button button-primary restaurant-wizard-submit"' . $disabled_attr . '>' . esc_html__( 'Submit Meal Plan', 'restaurant-food-services' ) . '</button>';
 		echo '</section>';
+		echo '</div>';
+
+		echo '<div class="restaurant-wizard-submission-status" style="display: none; margin: 15px 0; padding: 12px; border-radius: 4px; border-left: 4px solid #0073aa; background: #f9f9f9;">';
+		echo '<span class="restaurant-wizard-submission-spinner" style="display: inline-block; width: 16px; height: 16px; border: 2px solid #f3f3f3; border-top: 2px solid #0073aa; border-radius: 50%; animation: restaurant-spin 0.8s linear infinite; margin-right: 10px; vertical-align: middle;"></span>';
+		echo '<span class="restaurant-wizard-submission-message"></span>';
 		echo '</div>';
 
 		echo '<div class="restaurant-wizard-actions">';

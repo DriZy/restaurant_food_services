@@ -1138,11 +1138,26 @@
 	font-weight: 500;
 }
 
+@keyframes restaurant-spin {
+	from { transform: rotate(0deg); }
+	to { transform: rotate(360deg); }
+}
+
 .restaurant-wizard-submission-status {
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	background-color: #f8f9fa;
+	gap: 12px;
+	padding: 15px;
+	margin: 20px 0;
+	border-radius: 6px;
+	border-left: 5px solid #0073aa;
+	background: #f9f9f9;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+	font-weight: 500;
+}
+
+.restaurant-wizard-submission-status.is-loading {
+	border-left-color: #0073aa;
 }
 
 .restaurant-wizard-submission-status.is-success {
@@ -1158,42 +1173,48 @@
 }
 
 .restaurant-wizard-submission-spinner {
-	display: inline-block;
-	width: 16px;
-	height: 16px;
-	border: 2px solid #f3f3f3;
-	border-top: 2px solid #0073aa;
+	display: none;
+	width: 20px;
+	height: 20px;
+	border: 3px solid rgba(0,0,0,0.1);
+	border-top: 3px solid #0073aa;
 	border-radius: 50%;
-	animation: restaurant-spin 0.8s linear infinite;
+	animation: restaurant-spin 1s linear infinite;
+	flex-shrink: 0;
 }
 
-.restaurant-wizard-submission-status.is-success .restaurant-wizard-submission-spinner,
-.restaurant-wizard-submission-status.is-error .restaurant-wizard-submission-spinner {
-	display: none;
+.restaurant-wizard-submission-status.is-loading .restaurant-wizard-submission-spinner {
+	display: inline-block;
 }
 
 .restaurant-wizard-submission-status.is-success::before {
 	content: '✓';
 	display: inline-block;
-	width: 16px;
-	height: 16px;
+	width: 20px;
+	height: 20px;
 	font-weight: bold;
-	line-height: 16px;
+	line-height: 20px;
 	text-align: center;
 	color: #28a745;
 	flex-shrink: 0;
+	font-size: 18px;
 }
 
 .restaurant-wizard-submission-status.is-error::before {
 	content: '✕';
 	display: inline-block;
-	width: 16px;
-	height: 16px;
+	width: 20px;
+	height: 20px;
 	font-weight: bold;
-	line-height: 16px;
+	line-height: 20px;
 	text-align: center;
 	color: #dc3545;
 	flex-shrink: 0;
+	font-size: 18px;
+}
+
+.restaurant-wizard-submission-status.is-loading::before {
+	display: none;
 }
 
 /* Account hub and authentication UI */

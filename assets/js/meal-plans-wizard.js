@@ -116,7 +116,11 @@
 		};
 
 		this.$root.find('input[type="radio"], input[type="checkbox"]').prop('checked', false);
-		this.$root.find('input[value="individual"]').prop('checked', true);
+		var $defaultPlan = this.$root.find('input[name="plan_type"][value="individual"]');
+		if ($defaultPlan.length) {
+			$defaultPlan.prop('checked', true);
+		}
+		
 		this.$root.find('input[type="text"], input[type="number"], input[type="hidden"], textarea').val('');
 		this.$root.find('select').val('');
 		this.$root.find('#family_size').val(2);
@@ -209,7 +213,8 @@
 			self.updateSidebar();
 		});
 
-		this.$next.on('click', function () {
+		this.$next.on('click', function (e) {
+			e.preventDefault();
 			if (!self.validateStep(self.currentStep)) {
 				return;
 			}
@@ -219,13 +224,15 @@
 			self.scrollToTop();
 		});
 
-		this.$prev.on('click', function () {
+		this.$prev.on('click', function (e) {
+			e.preventDefault();
 			self.currentStep = Math.max(1, self.currentStep - 1);
 			self.syncUI();
 			self.scrollToTop();
 		});
 
-		this.$submit.on('click', function () {
+		this.$submit.on('click', function (e) {
+			e.preventDefault();
 			self.submit();
 		});
 	};
@@ -243,7 +250,7 @@
 	MealPlansWizard.prototype.scrollToTop = function () {
 		var offset = this.$root.offset().top - 100;
 		$('html, body').animate({
-			scrollTop: offset
+			scrollTop: Math.max(0, offset)
 		}, 300);
 	};
 
@@ -254,7 +261,8 @@
 
 		if (step === 1) {
 			if (!this.state.planType) {
-				setInlineError(this.$root.find('input[name="plan_type"]').last().closest('label'), 'Please choose a plan type.');
+				var $planContainer = this.$root.find('input[name="plan_type"]').last().closest('.restaurant-wizard-field-card');
+				setInlineError($planContainer.length ? $planContainer : this.$root.find('input[name="plan_type"]').last(), 'Please choose a plan type.');
 				notify('Please choose a plan type.', 'error');
 				return false;
 			}
@@ -400,12 +408,16 @@
 			$step.toggleClass('is-complete', stepNum < self.currentStep);
 		});
 
-		this.$prev.prop('disabled', this.currentStep === 1);
-		this.$next.toggle(this.currentStep < 5);
-		this.$submit.toggle(this.currentStep === 5);
-		this.$root.toggleClass('is-summary-step', this.currentStep === 5);
+		var isStepOne = this.currentStep === 1;
+		var isLastStep = this.currentStep === 5;
+		var isOpen = this.$root.data('subscriptions-open') == '1';
 
-		if (this.currentStep === 5) {
+		this.$prev.prop('disabled', isStepOne);
+		this.$next.toggle(!isLastStep).prop('disabled', !isOpen);
+		this.$submit.toggle(isLastStep).prop('disabled', !isOpen);
+		this.$root.toggleClass('is-summary-step', isLastStep);
+
+		if (isLastStep) {
 			this.renderSummary();
 		}
 	};

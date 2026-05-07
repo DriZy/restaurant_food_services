@@ -85,6 +85,7 @@ class Public_Module extends Abstract_Module {
 		$loader->add_action( 'wp_ajax_nopriv_restaurant_submit_catering_request', $this, 'ajax_submit_catering_request' );
 		$loader->add_action( 'wp_ajax_restaurant_submit_catering', $this, 'ajax_submit_catering_request' );
 		$loader->add_action( 'wp_ajax_nopriv_restaurant_submit_catering', $this, 'ajax_submit_catering_request' );
+		$loader->add_action( 'wp_ajax_restaurant_get_form_redirect_state', $this, 'ajax_get_form_redirect_state' );
 		$loader->add_action( 'wp_ajax_restaurant_calculate_catering_price', $this, 'ajax_calculate_catering_price' );
 		$loader->add_action( 'wp_ajax_nopriv_restaurant_calculate_catering_price', $this, 'ajax_calculate_catering_price' );
 		$loader->add_action( 'woocommerce_checkout_create_order', $this, 'attach_meal_plan_selection_to_order' );
@@ -114,19 +115,35 @@ class Public_Module extends Abstract_Module {
 			true
 		);
 
+		$is_logged_in           = is_user_logged_in();
+		$signup_page_id         = $this->get_signup_page_id();
+		$signup_url             = $signup_page_id > 0 ? get_permalink( $signup_page_id ) : '';
+
 		wp_localize_script(
 			'restaurant-food-services-public',
 			'RestaurantFoodServicesPublic',
 			array(
 				'ajaxUrl'              => admin_url( 'admin-ajax.php' ),
+				'isLoggedIn'           => $is_logged_in,
+				'signupUrl'            => $signup_url,
 				'nonce'                => wp_create_nonce( 'restaurant_add_meal_to_cart' ),
 				'mealPlanSubmitNonce'  => wp_create_nonce( 'restaurant_meal_plan_wizard_submit' ),
 				'locationSearchNonce'  => wp_create_nonce( 'restaurant_location_autocomplete' ),
 				'cateringDraftNonce'   => wp_create_nonce( 'restaurant_catering_wizard_draft' ),
 				'cateringSubmitNonce'  => wp_create_nonce( 'restaurant_catering_wizard_submit' ),
 				'cateringPriceNonce'   => wp_create_nonce( 'restaurant_catering_price_preview' ),
+				'cateringRequestsNonce'=> wp_create_nonce( 'restaurant_catering_requests_ajax' ),
+				'formRestoreNonce'     => wp_create_nonce( 'restaurant_form_redirect_state' ),
 				'cateringDraftPayload' => $catering_draft_payload,
 			)
+		);
+
+		wp_enqueue_script(
+			'restaurant-food-services-catering-requests-ajax',
+			RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-requests-ajax.js',
+			array( 'jquery', 'restaurant-food-services-public' ),
+			defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0',
+			true
 		);
 
 		wp_enqueue_script(
@@ -144,6 +161,29 @@ class Public_Module extends Abstract_Module {
 			defined( 'RESTAURANT_FOOD_SERVICES_VERSION' ) ? RESTAURANT_FOOD_SERVICES_VERSION : '1.0.0',
 			true
 		);
+	}
+
+	protected function get_signup_page_id() {
+		$cached_id = absint( get_transient( 'restaurant_food_services_signup_page_id' ) );
+		if ( $cached_id > 0 ) {
+			return $cached_id;
+		}
+
+		$pages = get_posts(
+			array(
+				'post_type'      => 'page',
+				'post_status'    => 'publish',
+				'posts_per_page' => 1,
+				's'              => '[restaurant_signup',
+			)
+		);
+
+		if ( ! empty( $pages ) && isset( $pages[0]->ID ) ) {
+			set_transient( 'restaurant_food_services_signup_page_id', absint( $pages[0]->ID ), DAY_IN_SECONDS );
+			return absint( $pages[0]->ID );
+		}
+
+		return 0;
 	}
 
 	/**
@@ -932,7 +972,19 @@ class Public_Module extends Abstract_Module {
 		$user_id = get_current_user_id();
 
 		if ( $user_id <= 0 ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Please log in to save a draft.', 'restaurant-food-services' ) ), 401 );
+			$redirect_data = $this->save_form_redirect_state( 'catering', $_POST );
+			$signup_page_id = $this->get_signup_page_id();
+			$signup_url = $signup_page_id > 0 ? add_query_arg( 'auth', 'signin', get_permalink( $signup_page_id ) ) : '/sign-up';
+
+			wp_send_json_error(
+				array(
+					'message'            => esc_html__( 'Please log in to save a draft.', 'restaurant-food-services' ),
+					'redirect_url'       => $signup_url,
+					'redirect_state_id'  => $redirect_data['state_id'],
+					'auth_required'      => true,
+				),
+				401
+			);
 		}
 
 		if ( ! post_type_exists( 'catering_request' ) ) {
@@ -1055,7 +1107,18 @@ class Public_Module extends Abstract_Module {
 		$user_id = get_current_user_id();
 
 		if ( $user_id <= 0 ) {
-			wp_send_json_error( array( 'message' => esc_html__( 'Please log in to submit a catering request.', 'restaurant-food-services' ) ), 401 );
+			$redirect_data = $this->save_form_redirect_state( 'catering', $_POST );
+			$signup_page_id = $this->get_signup_page_id();
+			$signup_url = $signup_page_id > 0 ? add_query_arg( 'auth', 'signin', get_permalink( $signup_page_id ) ) : '';
+			wp_send_json_error( 
+				array( 
+					'message' => esc_html__( 'Please log in to submit a catering request.', 'restaurant-food-services' ),
+					'redirect_url' => $signup_url,
+					'redirect_state_id' => $redirect_data['state_id'],
+					'auth_required' => true,
+				), 
+				401 
+			);
 		}
 
 		$event_type  = isset( $_POST['event_type'] ) ? sanitize_text_field( wp_unslash( $_POST['event_type'] ) ) : '';
@@ -1397,6 +1460,23 @@ class Public_Module extends Abstract_Module {
 
 		if ( ! check_ajax_referer( 'restaurant_meal_plan_wizard_submit', 'nonce', false ) ) {
 			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		$user_id = get_current_user_id();
+
+		if ( $user_id <= 0 ) {
+			$redirect_data = $this->save_form_redirect_state( 'meal_plan', $_POST );
+			$signup_page_id = $this->get_signup_page_id();
+			$signup_url = $signup_page_id > 0 ? add_query_arg( 'auth', 'signin', get_permalink( $signup_page_id ) ) : '';
+			wp_send_json_error( 
+				array( 
+					'message' => esc_html__( 'Please log in to submit a meal plan.', 'restaurant-food-services' ),
+					'redirect_url' => $signup_url,
+					'redirect_state_id' => $redirect_data['state_id'],
+					'auth_required' => true,
+				), 
+				401 
+			);
 		}
 
 		if ( ! $this->is_meal_plan_subscription_window_open() ) {
@@ -2273,5 +2353,116 @@ class Public_Module extends Abstract_Module {
 	public function render_catering_shortcode( $atts ) {
 		return $this->catering_page->render( $atts );
 	}
-}
 
+	/**
+	 * Saves form data to transient storage for unauthenticated users to retrieve after login.
+	 *
+	 * @param string              $form_type Form type ('catering' or 'meal_plan').
+	 * @param array<string,mixed> $post_data Posted form data.
+	 *
+	 * @return array<string,string>
+	 */
+	protected function save_form_redirect_state( $form_type, $post_data ) {
+		$state_id = md5( uniqid( 'restaurant_form_state_', true ) . wp_rand() );
+		$state_key = 'restaurant_form_redirect_' . $state_id;
+		$resume_step = isset( $post_data['current_step'] ) ? absint( wp_unslash( $post_data['current_step'] ) ) : 0;
+		$source_url  = isset( $post_data['source_url'] ) ? esc_url_raw( wp_unslash( $post_data['source_url'] ) ) : '';
+		
+		$state = array(
+			'form_type' => sanitize_key( $form_type ),
+			'data' => $post_data,
+			'resume_step' => $resume_step,
+			'source_url' => $source_url,
+			'created_at' => time(),
+		);
+		
+		set_transient( $state_key, $state, 2 * HOUR_IN_SECONDS );
+		
+		return array(
+			'state_id' => $state_id,
+			'state_key' => $state_key,
+		);
+	}
+
+	/**
+	 * Retrieves form state that was saved before redirect to login.
+	 *
+	 * @param string $state_id The state ID from the redirect.
+	 *
+	 * @return array<string,mixed>|false
+	 */
+	protected function get_form_redirect_state( $state_id ) {
+		$state_id = sanitize_key( (string) $state_id );
+		$state_key = 'restaurant_form_redirect_' . $state_id;
+		$state_json = get_transient( $state_key );
+		
+		if ( ! $state_json ) {
+			return false;
+		}
+		
+		if ( is_array( $state_json ) ) {
+			$state = $state_json;
+		} else {
+			$state = json_decode( (string) $state_json, true );
+		}
+		
+		if ( ! is_array( $state ) ) {
+			return false;
+		}
+		
+		return $state;
+	}
+
+	/**
+	 * AJAX handler: Retrieves a saved auth redirect state after login.
+	 *
+	 * @return void
+	 */
+	public function ajax_get_form_redirect_state() {
+		if ( 'POST' !== strtoupper( (string) $_SERVER['REQUEST_METHOD'] ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Invalid request method.', 'restaurant-food-services' ) ), 405 );
+		}
+
+		if ( ! check_ajax_referer( 'restaurant_form_redirect_state', 'nonce', false ) ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Security check failed.', 'restaurant-food-services' ) ), 403 );
+		}
+
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'You must be logged in to restore a form submission.', 'restaurant-food-services' ) ), 401 );
+		}
+
+		$state_id = isset( $_POST['state_id'] ) ? sanitize_key( wp_unslash( $_POST['state_id'] ) ) : '';
+
+		if ( '' === $state_id ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'Missing restore state.', 'restaurant-food-services' ) ), 400 );
+		}
+
+		$state = $this->get_form_redirect_state( $state_id );
+
+		if ( ! $state ) {
+			wp_send_json_error( array( 'message' => esc_html__( 'The saved form state could not be found or has expired.', 'restaurant-food-services' ) ), 404 );
+		}
+
+		$this->clear_form_redirect_state( $state_id );
+
+		wp_send_json_success(
+			array(
+				'state_id' => $state_id,
+				'state'    => $state,
+			)
+		);
+	}
+
+	/**
+	 * Clears saved form state after it's been used.
+	 *
+	 * @param string $state_id The state ID to clear.
+	 *
+	 * @return void
+	 */
+	protected function clear_form_redirect_state( $state_id ) {
+		$state_id = sanitize_key( (string) $state_id );
+		$state_key = 'restaurant_form_redirect_' . $state_id;
+		delete_transient( $state_key );
+	}
+}

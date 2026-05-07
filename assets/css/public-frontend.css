@@ -130,6 +130,96 @@
 	gap: 15px;
 }
 
+.restaurant-table-wrapper {
+	width: 100%;
+	overflow-x: auto;
+	margin-bottom: 1rem;
+}
+
+.restaurant-catering-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.restaurant-catering-table th,
+.restaurant-catering-table td {
+	padding: 12px 15px;
+	text-align: left;
+}
+
+.restaurant-ajax-container.is-loading {
+	position: relative;
+	pointer-events: none;
+}
+
+.restaurant-pagination {
+	margin-top: 1.5rem;
+	display: flex;
+	justify-content: center;
+}
+
+.restaurant-pagination ul {
+	display: flex;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	gap: 5px;
+}
+
+.restaurant-pagination li a,
+.restaurant-pagination li span {
+	display: block;
+	padding: 8px 12px;
+	border: 1px solid #ddd;
+	border-radius: 4px;
+	text-decoration: none;
+	color: #333;
+	transition: all 0.2s ease;
+}
+
+.restaurant-pagination li span.current {
+	background: var(--brens-primary, #fbb03b);
+	color: #fff;
+	border-color: var(--brens-primary, #fbb03b);
+}
+
+.restaurant-pagination li a:hover {
+	background: #f5f5f5;
+	border-color: #ccc;
+}
+
+@media (max-width: 768px) {
+	.restaurant-catering-table thead {
+		display: none;
+	}
+
+	.restaurant-catering-table tr {
+		display: block;
+		margin-bottom: 15px;
+		border: 1px solid #eee;
+		border-radius: 8px;
+		padding: 10px;
+		background: #fff;
+	}
+
+	.restaurant-catering-table td {
+		display: flex;
+		justify-content: space-between;
+		padding: 8px 5px;
+		border-bottom: 1px solid #f9f9f9;
+	}
+
+	.restaurant-catering-table td:last-child {
+		border-bottom: 0;
+	}
+
+	.restaurant-catering-table td::before {
+		content: attr(data-title);
+		font-weight: 700;
+		margin-right: 10px;
+	}
+}
+
 .restaurant-catering-request-item {
 	border: 1px solid #e0e0e0;
 	border-radius: 6px;
@@ -1588,4 +1678,548 @@
 	}
 }
 
+/* Authentication Modal Overlay */
+.restaurant-auth-modal-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.5);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 9999;
+	padding: 1rem;
+	overflow-y: auto;
+}
+
+.restaurant-auth-modal {
+	background: #fff;
+	border-radius: 0.75rem;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+	max-width: 480px;
+	width: 100%;
+	position: relative;
+	margin: auto;
+}
+
+.restaurant-auth-modal__close {
+	position: absolute;
+	top: 1rem;
+	right: 1rem;
+	background: none;
+	border: none;
+	font-size: 1.75rem;
+	cursor: pointer;
+	color: #666;
+	padding: 0;
+	width: 32px;
+	height: 32px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: color 0.2s ease;
+	z-index: 10;
+}
+
+.restaurant-auth-modal__close:hover {
+	color: #000;
+}
+
+.restaurant-auth-modal__content {
+	padding: 2.5rem 1.5rem 1.5rem;
+}
+
+.restaurant-auth-modal__content h3 {
+	margin: 0 0 0.75rem;
+	font-size: 1.5rem;
+}
+
+.restaurant-auth-modal__content p {
+	margin: 0.5rem 0;
+	color: #666;
+	font-size: 0.95rem;
+	line-height: 1.5;
+}
+
+.restaurant-auth-modal__button {
+	display: block;
+	width: 100%;
+	margin-top: 1.5rem;
+	padding: 0.875rem 1rem !important;
+	text-align: center;
+	text-decoration: none;
+	font-weight: 600;
+}
+
+/* Responsive Wizard Styles */
+@media (max-width: 1024px) {
+	.restaurant-wizard-container {
+		grid-template-columns: 1fr;
+	}
+
+	.restaurant-wizard-summary-sidebar {
+		order: -1;
+		margin-bottom: 1.5rem;
+	}
+
+	.restaurant-frontend-page__container {
+		padding: 1rem;
+	}
+}
+
+@media (max-width: 768px) {
+	/* Hero section */
+	.restaurant-account-hero {
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.restaurant-account-hero h2 {
+		font-size: 1.5rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.restaurant-account-hero p {
+		margin-bottom: 0.5rem;
+	}
+
+	.restaurant-account-hero__actions {
+		width: 100%;
+		flex-direction: column;
+	}
+
+	.restaurant-account-hero__actions .button {
+		width: 100%;
+		padding: 0.75rem !important;
+	}
+
+	/* Account overview grid */
+	.restaurant-account-overview-grid {
+		grid-template-columns: 1fr;
+		gap: 1rem;
+	}
+
+	/* Wizard styles */
+	.restaurant-wizard-field-card {
+		padding: 1rem;
+	}
+
+	.restaurant-wizard-steps {
+		flex-direction: column;
+		margin-bottom: 1.5rem;
+	}
+
+	.restaurant-wizard-steps li {
+		flex: 1;
+		text-align: left;
+		padding-bottom: 0.75rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.restaurant-wizard-steps li:not(:last-child) {
+		border-bottom: 1px solid #ddd;
+	}
+
+	.restaurant-wizard-steps li::before {
+		display: inline-block;
+		width: 24px;
+		height: 24px;
+		margin-right: 0.5rem;
+	}
+
+	/* Navigation buttons */
+	.restaurant-wizard-actions {
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.restaurant-wizard-next,
+	.restaurant-wizard-prev,
+	.restaurant-catering-submit,
+	.restaurant-wizard-submit,
+	.restaurant-catering-save-draft {
+		width: 100%;
+		padding: 0.875rem !important;
+		font-size: 0.95rem;
+	}
+
+	/* Summary sidebar */
+	.restaurant-summary-sidebar {
+		position: sticky;
+		bottom: 0;
+		background: #fff;
+		border-top: 2px solid #f0f0f0;
+		margin: 1rem -1rem 0;
+		padding: 1rem;
+		z-index: 100;
+	}
+
+	.restaurant-summary-sidebar__items {
+		max-height: 200px;
+		overflow-y: auto;
+	}
+
+	.restaurant-summary-sidebar__total {
+		margin-top: 1rem;
+		padding-top: 1rem;
+		border-top: 1px solid #eee;
+	}
+
+	/* Checkout page responsive */
+	.woocommerce-checkout {
+		max-width: 100%;
+	}
+
+	.checkout {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 1.5rem;
+	}
+
+	.woocommerce-checkout-review-order {
+		order: -1;
+	}
+
+	/* Tables responsive */
+	.restaurant-table-wrapper {
+		overflow-x: auto;
+		-webkit-overflow-scrolling: touch;
+	}
+
+	.woocommerce-orders-table,
+	.restaurant-catering-table {
+		font-size: 0.9rem;
+	}
+
+	.woocommerce-orders-table thead,
+	.restaurant-catering-table thead {
+		display: none;
+	}
+
+	.woocommerce-orders-table tbody tr,
+	.restaurant-catering-table tbody tr {
+		display: grid;
+		grid-template-columns: 1fr;
+		gap: 0.5rem;
+		border-top: 1px solid #e6e6e6;
+		padding: 1rem 0;
+		margin-bottom: 0.5rem;
+	}
+
+	.woocommerce-orders-table tbody tr:first-child,
+	.restaurant-catering-table tbody tr:first-child {
+		border-top: none;
+		padding-top: 0;
+	}
+
+	.woocommerce-orders-table td,
+	.restaurant-catering-table td {
+		display: grid;
+		grid-template-columns: auto 1fr;
+		gap: 1rem;
+		padding: 0.5rem 0;
+	}
+
+	.woocommerce-orders-table td::before,
+	.restaurant-catering-table td::before {
+		content: attr(data-title);
+		font-weight: 600;
+		color: #666;
+		text-transform: capitalize;
+	}
+
+	/* Pagination */
+	.restaurant-pagination {
+		display: flex;
+		justify-content: center;
+		gap: 0.5rem;
+		margin-top: 1.5rem;
+		flex-wrap: wrap;
+	}
+
+	.restaurant-pagination a,
+	.restaurant-pagination span {
+		padding: 0.5rem 0.75rem !important;
+		font-size: 0.9rem;
+	}
+
+	/* Form fields */
+	.woocommerce-form-row {
+		display: grid !important;
+		margin-bottom: 1rem !important;
+	}
+
+	.woocommerce-form-row--wide {
+		grid-template-columns: 1fr !important;
+	}
+
+	.woocommerce-form-row input,
+	.woocommerce-form-row select,
+	.woocommerce-form-row textarea {
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	/* Auth form */
+	.restaurant-account-auth__form {
+		padding: 1.5rem;
+	}
+
+	.restaurant-account-auth__form .woocommerce-form {
+		gap: 0.75rem !important;
+	}
+
+	.restaurant-account-auth__tabs {
+		grid-template-columns: repeat(2, 1fr);
+		gap: 0.25rem;
+	}
+
+	.restaurant-account-auth__tab {
+		padding: 0.65rem 0.75rem;
+		font-size: 0.9rem;
+	}
+
+	/* Mobile CTA button */
+	.restaurant-mobile-cta {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background: #fff;
+		border-top: 1px solid #e6e6e6;
+		padding: 1rem;
+		z-index: 999;
+		box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+	}
+
+	.restaurant-mobile-cta__button {
+		width: 100%;
+		padding: 0.875rem !important;
+		font-weight: 600;
+		border-radius: 0.5rem;
+	}
+
+	.restaurant-frontend-page {
+		padding-bottom: 80px;
+	}
+
+	/* Quick actions grid */
+	.restaurant-quick-actions-grid {
+		grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.restaurant-quick-action-button {
+		padding: 0.6rem;
+		font-size: 0.85rem;
+	}
+
+	.restaurant-quick-action-icon {
+		font-size: 1.5rem;
+	}
+
+	/* Drafts and requests */
+	.restaurant-account-draft-item {
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.restaurant-account-draft-item__actions {
+		width: 100%;
+		flex-direction: column;
+	}
+
+	.restaurant-account-draft-item__actions .button {
+		width: 100%;
+		padding: 0.6rem !important;
+		font-size: 0.9rem;
+	}
+
+	/* Section headers */
+	.restaurant-account-section-header {
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	/* Profile list */
+	.restaurant-account-profile-list {
+		gap: 0.5rem;
+	}
+
+	.restaurant-account-profile-list li {
+		padding-top: 0.5rem;
+	}
+
+	/* Summary panels */
+	.restaurant-summary-panel {
+		padding: 1rem;
+	}
+
+	.restaurant-summary-grid {
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
+	}
+
+	.restaurant-summary-item {
+		display: flex !important;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	/* Modal sizing */
+	.restaurant-auth-modal {
+		max-width: 90%;
+		max-height: 90vh;
+		overflow-y: auto;
+	}
+
+	.restaurant-auth-modal__content {
+		padding: 2rem 1.25rem 1.25rem;
+	}
+
+	.restaurant-auth-modal__close {
+		width: 28px;
+		height: 28px;
+		font-size: 1.5rem;
+	}
+}
+
+@media (max-width: 480px) {
+	/* Extra small devices */
+	.restaurant-account-hero h2 {
+		font-size: 1.25rem;
+	}
+
+	.restaurant-account-auth__tabs {
+		grid-template-columns: 1fr;
+	}
+
+	.restaurant-account-auth__tab {
+		padding: 0.65rem 0.5rem;
+		font-size: 0.85rem;
+	}
+
+	.restaurant-wizard-field-card {
+		padding: 0.75rem;
+	}
+
+	.restaurant-wizard-next,
+	.restaurant-wizard-prev,
+	.restaurant-catering-submit,
+	.restaurant-wizard-submit,
+	.restaurant-catering-save-draft {
+		padding: 0.75rem !important;
+		font-size: 0.9rem;
+	}
+
+	/* Form rows */
+	.woocommerce-form-row input,
+	.woocommerce-form-row select,
+	.woocommerce-form-row textarea {
+		font-size: 16px; /* Prevents zoom on input focus */
+	}
+
+	/* Tables */
+	.woocommerce-orders-table td {
+		grid-template-columns: auto 1fr;
+		gap: 0.5rem;
+		padding: 0.4rem 0;
+	}
+
+	.woocommerce-orders-table td::before {
+		font-size: 0.85rem;
+	}
+
+	/* Mobile CTA */
+	.restaurant-mobile-cta {
+		padding: 0.75rem;
+	}
+
+	.restaurant-mobile-cta__button {
+		padding: 0.75rem !important;
+	}
+
+	/* Summary sidebar */
+	.restaurant-summary-sidebar {
+		margin: 1rem -1rem 0;
+		padding: 0.75rem;
+	}
+
+	/* Auth modal */
+	.restaurant-auth-modal-overlay {
+		padding: 0.5rem;
+	}
+
+	.restaurant-auth-modal {
+		max-width: 95%;
+	}
+
+	.restaurant-auth-modal__content {
+		padding: 1.75rem 1rem 1rem;
+	}
+
+	.restaurant-auth-modal__content h3 {
+		font-size: 1.25rem;
+	}
+
+	.restaurant-auth-modal__content p {
+		font-size: 0.9rem;
+	}
+}
+
+/* Print styles */
+@media print {
+	.restaurant-wizard-actions,
+	.restaurant-mobile-cta,
+	.restaurant-auth-modal-overlay {
+		display: none !important;
+	}
+}
+
+/* WooCommerce checkout mobile layout fixes - center and prevent left shift */
+.woocommerce-checkout,
+.woocommerce-page .woocommerce-checkout,
+.woocommerce-checkout .woocommerce,
+.page-template-default .woocommerce-checkout {
+	max-width: 100% !important;
+	margin-left: auto !important;
+	margin-right: auto !important;
+	padding-left: 1rem !important;
+	padding-right: 1rem !important;
+	box-sizing: border-box;
+}
+
+/* Ensure checkout columns collapse and don't float on mobile */
+@media (max-width: 768px) {
+	.woocommerce-checkout .col2-set,
+	.woocommerce-checkout .woocommerce-checkout-review-order,
+	.woocommerce-checkout .col-1,
+	.woocommerce-checkout .col-2,
+	.woocommerce-checkout .woocommerce-billing-fields,
+	.woocommerce-checkout .woocommerce-shipping-fields {
+		width: 100% !important;
+		float: none !important;
+		margin: 0 !important;
+	}
+
+	/* Prevent negative margins from theme containers */
+	.woocommerce-checkout .entry-content,
+	.woocommerce-checkout .site-content,
+	.woocommerce-checkout .content-area {
+		padding-left: 0 !important;
+		padding-right: 0 !important;
+		margin-left: 0 !important;
+		margin-right: 0 !important;
+	}
+
+	/* Ensure table containers don't overflow causing horizontal scroll */
+	.woocommerce-checkout table,
+	.woocommerce-checkout .form-row,
+	.woocommerce-checkout .woocommerce-billing-fields__field-wrapper {
+		width: 100% !important;
+		box-sizing: border-box;
+	}
+}
 

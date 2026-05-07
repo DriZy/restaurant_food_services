@@ -308,7 +308,7 @@ class Catering_Module extends Abstract_Module {
 			wp_enqueue_script(
 				'restaurant-food-services-catering-chat-ajax',
 				RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-chat-ajax.js',
-				array(),
+				array( 'jquery' ),
 				$script_version,
 				true
 			);
@@ -384,7 +384,7 @@ class Catering_Module extends Abstract_Module {
 		wp_enqueue_script(
 			'restaurant-food-services-catering-chat-ajax',
 			RESTAURANT_FOOD_SERVICES_URL . 'assets/js/catering-chat-ajax.js',
-			array(),
+			array( 'jquery' ),
 			$script_version,
 			true
 		);
@@ -2466,7 +2466,9 @@ class Catering_Module extends Abstract_Module {
 		$comment_html .= '</article>';
 
 		// Return success with the new comment HTML
+		ob_start();
 		do_action( 'restaurant_food_services_catering_chat_message_sent', $comment_id, $catering_id );
+		ob_end_clean();
 
 		wp_send_json_success(
 			array(

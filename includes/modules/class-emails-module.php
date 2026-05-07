@@ -173,8 +173,13 @@ class Emails_Module extends Abstract_Module {
 	 *
 	 * @return void
 	 */
-	public function send_catering_chat_notification_email( $comment_id, $catering_id ) {
-		$comment  = get_comment( $comment_id );
+	public function send_catering_chat_notification_email( $comment_id, $catering_id = 0 ) {
+		$comment = get_comment( $comment_id );
+
+		if ( ! $catering_id && $comment ) {
+			$catering_id = absint( $comment->comment_post_ID );
+		}
+
 		$catering = get_post( $catering_id );
 
 		if ( ! $comment || ! $catering ) {
@@ -357,18 +362,56 @@ class Emails_Module extends Abstract_Module {
 			$plan_name = __( 'Meal Plan Subscription', 'restaurant-food-services' );
 		}
 
+		// Get delivery info and selected meals
+		$location_data = array(
+			'formatted_address' => '',
+			'latitude'          => 0.0,
+			'longitude'         => 0.0,
+		);
+
+		if ( isset( $subscription->location_data ) && ! empty( $subscription->location_data ) ) {
+			$decoded_location = json_decode( $subscription->location_data, true );
+			if ( is_array( $decoded_location ) ) {
+				$location_data = $decoded_location;
+			}
+		}
+
+		$selected_meals = array();
+		if ( isset( $subscription->selected_meals ) && ! empty( $subscription->selected_meals ) ) {
+			$decoded_meals = json_decode( $subscription->selected_meals, true );
+			if ( is_array( $decoded_meals ) ) {
+				$selected_meals = $decoded_meals;
+			}
+		}
+
+		$delivery_days = array();
+		if ( isset( $subscription->delivery_days ) && ! empty( $subscription->delivery_days ) ) {
+			$decoded_days = json_decode( $subscription->delivery_days, true );
+			if ( is_array( $decoded_days ) ) {
+				$delivery_days = $decoded_days;
+			}
+		}
+
 		return array(
 			'subscription_id'  => $subscription->id,
 			'plan_id'          => $subscription->plan_id,
 			'plan_name'        => $plan_name,
 			'plan_type'        => $plan_type,
 			'meals_per_week'   => $subscription->meals_per_week,
+			'family_size'      => isset( $subscription->family_size ) ? absint( $subscription->family_size ) : 1,
 			'user_id'          => $subscription->user_id,
 			'user_email'       => $user->user_email,
 			'user_name'        => $user->display_name,
 			'status'           => $subscription->status,
 			'next_order_date'  => $subscription->next_order_date,
 			'created_at'       => $subscription->created_at,
+			'delivery_location' => isset( $location_data['formatted_address'] ) ? $location_data['formatted_address'] : '',
+			'delivery_latitude' => isset( $location_data['latitude'] ) ? $location_data['latitude'] : 0.0,
+			'delivery_longitude' => isset( $location_data['longitude'] ) ? $location_data['longitude'] : 0.0,
+			'delivery_days'    => ! empty( $delivery_days ) ? implode( ', ', array_map( 'ucfirst', $delivery_days ) ) : '',
+			'delivery_days_array' => $delivery_days,
+			'delivery_time_slot' => isset( $subscription->delivery_time_slot ) ? sanitize_text_field( (string) $subscription->delivery_time_slot ) : '',
+			'selected_meals'   => $selected_meals,
 		);
 	}
 

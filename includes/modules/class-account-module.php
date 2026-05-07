@@ -52,6 +52,8 @@ class Account_Module extends Abstract_Module {
 		$loader->add_action( 'init', $this, 'register_account_shortcode' );
 		$loader->add_action( 'init', $this, 'handle_draft_delete_action' );
 		$loader->add_action( 'init', $this, 'block_wp_login' );
+		$loader->add_action( 'admin_init', $this, 'block_wp_admin' );
+		$loader->add_action( 'template_redirect', $this, 'redirect_woocommerce_login_to_plugin', 5 );
 		$loader->add_filter( 'woocommerce_account_menu_items', $this, 'add_account_menu_item' );
 		$loader->add_action( 'woocommerce_account_' . $this->endpoint . '_endpoint', $this, 'render_account_endpoint' );
 		$loader->add_action( 'woocommerce_before_customer_login_form', $this, 'render_login_intro' );
@@ -59,6 +61,7 @@ class Account_Module extends Abstract_Module {
 		$loader->add_filter( 'woocommerce_logout_redirect', $this, 'redirect_to_signup_after_logout' );
 		$loader->add_filter( 'login_url', $this, 'filter_login_url', 10, 3 );
 		$loader->add_filter( 'logout_url', $this, 'filter_logout_url', 10, 2 );
+		$loader->add_action( 'wp_ajax_restaurant_get_catering_requests', $this, 'ajax_get_catering_requests' );
 	}
 
 	/**
@@ -72,14 +75,13 @@ class Account_Module extends Abstract_Module {
 	 */
 	public function filter_login_url( $login_url, $redirect = '', $force_reauth = false ) {
 		$signup_page_id = $this->get_signup_page_id();
-		if ( $signup_page_id > 0 ) {
-			$url = get_permalink( $signup_page_id );
-			if ( ! empty( $redirect ) ) {
-				$url = add_query_arg( 'redirect_to', urlencode( $redirect ), $url );
-			}
-			return $url;
+		$url = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : '/sign-up';
+
+		if ( ! empty( $redirect ) ) {
+			$url = add_query_arg( 'redirect_to', urlencode( $redirect ), $url );
 		}
-		return $login_url;
+
+		return $url;
 	}
 
 	/**
@@ -111,15 +113,70 @@ class Account_Module extends Abstract_Module {
 	public function block_wp_login() {
 		global $pagenow;
 
-		if ( 'wp-login.php' === $pagenow && 'GET' === $_SERVER['REQUEST_METHOD'] && ! isset( $_REQUEST['action'] ) && ! isset( $_REQUEST['interim-login'] ) ) {
-			if ( is_user_logged_in() ) {
-				wp_safe_redirect( $this->redirect_to_restaurant_hub_after_login() );
-				exit;
+		if ( 'wp-login.php' === $pagenow && 'GET' === $_SERVER['REQUEST_METHOD'] ) {
+			$action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+			
+			// Allow logout to proceed via default mechanism
+			if ( 'logout' === $action ) {
+				return;
 			}
 
+			// Allow password reset and registration if needed, but user wants to use custom page
+			// We redirect everything to our custom signup/login page
 			$signup_page_id = $this->get_signup_page_id();
-			if ( $signup_page_id > 0 ) {
-				wp_safe_redirect( get_permalink( $signup_page_id ) );
+			$redirect_url = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : '/sign-up';
+
+			if ( ! empty( $_GET['redirect_to'] ) ) {
+				$redirect_url = add_query_arg( 'redirect_to', urlencode( wp_unslash( $_GET['redirect_to'] ) ), $redirect_url );
+			}
+
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+	}
+
+	/**
+	 * Redirects WooCommerce my-account page when user is not logged in to plugin's signup page.
+	 *
+	 * @return void
+	 */
+	public function redirect_woocommerce_login_to_plugin() {
+		// Check if we're on WooCommerce my-account page
+		if ( ! function_exists( 'is_account_page' ) ) {
+			return;
+		}
+
+		if ( ! is_account_page() || is_user_logged_in() ) {
+			return;
+		}
+
+		// Redirect to plugin's signup/login page
+		$signup_page_id = $this->get_signup_page_id();
+		$redirect_url = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : '/sign-up';
+
+		$current_url = isset( $_SERVER['REQUEST_URI'] ) ? esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
+		if ( $current_url ) {
+			$redirect_url = add_query_arg( 'redirect_to', urlencode( $current_url ), $redirect_url );
+		}
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
+	 * Blocks access to /wp-admin for non-administrators.
+	 *
+	 * @return void
+	 */
+	public function block_wp_admin() {
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) && ! current_user_can( 'manage_options' ) ) {
+			if ( ! is_user_logged_in() ) {
+				$signup_page_id = $this->get_signup_page_id();
+				$redirect_url = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : '/sign-up';
+				wp_safe_redirect( $redirect_url );
+				exit;
+			} else {
+				wp_safe_redirect( $this->redirect_to_restaurant_hub_after_login() );
 				exit;
 			}
 		}
@@ -187,8 +244,8 @@ class Account_Module extends Abstract_Module {
 			);
 		} else {
 			$signup_page_id = $this->get_signup_page_id();
-			$url            = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : wp_login_url();
-			
+			$url            = ( $signup_page_id > 0 ) ? get_permalink( $signup_page_id ) : '/sign-up';
+
 			$is_login_active = ( rtrim( $current_url, '/' ) === rtrim( $url, '/' ) );
 			$login_class     = $is_login_active ? trim( $atts['class'] . ' is-active' ) : $atts['class'];
 
@@ -222,17 +279,10 @@ class Account_Module extends Abstract_Module {
 		);
 
 		if ( is_user_logged_in() ) {
+			// Redirect authenticated users to their account instead of showing signup page
 			$account_url = function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'myaccount' ) : home_url( '/' );
-			$logout_url  = $this->get_logout_url();
-
-			return sprintf(
-				'<div class="woocommerce"><div class="woocommerce-message"><p>%s</p><p><a class="button" href="%s">%s</a> <a class="button button-secondary" href="%s">%s</a></p></div></div>',
-				esc_html__( 'You are already signed in.', 'restaurant-food-services' ),
-				esc_url( $account_url ),
-				esc_html__( 'Go to My Account', 'restaurant-food-services' ),
-				esc_url( $logout_url ),
-				esc_html__( 'Log Out', 'restaurant-food-services' )
-			);
+			wp_safe_redirect( $account_url );
+			exit;
 		}
 
 		ob_start();
@@ -359,7 +409,7 @@ class Account_Module extends Abstract_Module {
 	 *
 	 * @return int
 	 */
-	protected function get_signup_page_id() {
+	public function get_signup_page_id() {
 		$cached_id = absint( get_transient( 'restaurant_food_services_signup_page_id' ) );
 		if ( $cached_id > 0 ) {
 			return $cached_id;
@@ -462,7 +512,10 @@ class Account_Module extends Abstract_Module {
 		$orders         = $this->get_customer_orders( (int) $user->ID );
 		$grouped_orders  = $this->group_orders_by_type( $orders );
 		$drafts         = $this->get_saved_catering_drafts( (int) $user->ID );
-		$active_requests = $this->get_active_catering_requests( (int) $user->ID );
+		
+		$catering_paged  = isset( $_GET['paged'] ) ? absint( $_GET['paged'] ) : 1;
+		$active_requests_query = $this->get_active_catering_requests( (int) $user->ID, $catering_paged );
+		
 		$profile        = $this->get_profile_summary( $user );
 		$catering_url   = $this->get_catering_page_url();
 		$meal_plans_url = $this->get_meal_plans_page_url();
@@ -546,9 +599,9 @@ class Account_Module extends Abstract_Module {
 			<section class="restaurant-account-card restaurant-account-requests-card">
 				<div class="restaurant-account-section-header">
 					<h3><?php esc_html_e( 'Active Catering Requests', 'restaurant-food-services' ); ?></h3>
-					<span><?php echo esc_html( sprintf( _n( '%d request', '%d requests', count( $active_requests ), 'restaurant-food-services' ), count( $active_requests ) ) ); ?></span>
+					<span><?php echo esc_html( sprintf( _n( '%d request', '%d requests', $active_requests_query->found_posts, 'restaurant-food-services' ), $active_requests_query->found_posts ) ); ?></span>
 				</div>
-				<?php echo $this->render_catering_requests_list( $active_requests ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<?php echo $this->render_catering_requests_list( $active_requests_query ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 			</section>
 
 			<?php foreach ( $this->get_order_group_configs() as $group_key => $group_config ) : ?>
@@ -936,73 +989,159 @@ class Account_Module extends Abstract_Module {
 	 * Gets active catering requests for the current user.
 	 *
 	 * @param int $user_id User ID.
+	 * @param int $paged   Page number.
+	 * @param int $per_page Posts per page.
 	 *
-	 * @return array<int,\WP_Post>
+	 * @return \WP_Query
 	 */
-	protected function get_active_catering_requests( $user_id ) {
+	protected function get_active_catering_requests( $user_id, $paged = 1, $per_page = 10 ) {
 		$args = array(
 			'post_type'      => 'catering_request',
-			'posts_per_page' => -1,
+			'post_status'    => array( 'publish', 'private', 'pending', 'future' ),
+			'posts_per_page' => absint( $per_page ),
+			'paged'          => absint( $paged ),
 			'author'         => absint( $user_id ),
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 		);
 
-		return get_posts( $args );
+		return new \WP_Query( $args );
+	}
+
+	/**
+	 * AJAX handler for fetching catering requests.
+	 *
+	 * @return void
+	 */
+	public function ajax_get_catering_requests() {
+		check_ajax_referer( 'restaurant_catering_requests_ajax', 'nonce' );
+
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( array( 'message' => __( 'You must be logged in.', 'restaurant-food-services' ) ) );
+		}
+
+		$paged    = isset( $_POST['paged'] ) ? absint( $_POST['paged'] ) : 1;
+		$user_id  = get_current_user_id();
+		$query    = $this->get_active_catering_requests( $user_id, $paged );
+
+		ob_start();
+		$this->render_catering_requests_table_content( $query );
+		$html = ob_get_clean();
+
+		wp_send_json_success( array( 'html' => $html ) );
 	}
 
 	/**
 	 * Renders a list of catering requests for the account hub.
 	 *
-	 * @param array<int,\WP_Post> $catering_requests Catering request posts.
+	 * @param \WP_Query $query Catering request query.
 	 *
 	 * @return string
 	 */
-	protected function render_catering_requests_list( $catering_requests ) {
+	protected function render_catering_requests_list( $query ) {
 		ob_start();
 		?>
-		<div class="restaurant-catering-requests-list">
-			<?php foreach ( $catering_requests as $request ) : ?>
-				<?php
-				$location       = sanitize_text_field( (string) get_post_meta( $request->ID, 'location', true ) );
-				$event_date     = sanitize_text_field( (string) get_post_meta( $request->ID, 'event_date', true ) );
-				$guest_count    = absint( get_post_meta( $request->ID, 'guest_count', true ) );
-				$status         = sanitize_key( (string) get_post_meta( $request->ID, 'catering_status', true ) );
-				$total_price    = (float) get_post_meta( $request->ID, 'total_price', true );
-
-				if ( empty( $status ) ) {
-					$status = 'pending';
-				}
-
-				$status_labels = array(
-					'pending'  => esc_html__( 'Pending Review', 'restaurant-food-services' ),
-					'approved' => esc_html__( 'Approved', 'restaurant-food-services' ),
-					'rejected' => esc_html__( 'Rejected', 'restaurant-food-services' ),
-				);
-
-				$status_label = isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : esc_html__( 'Unknown', 'restaurant-food-services' );
-				$detail_url   = add_query_arg( 'catering_request', $request->ID, home_url( '/my-account/my-catering-requests' ) );
-				?>
-				<div class="restaurant-catering-request-item">
-					<div class="restaurant-catering-request-header">
-						<div class="restaurant-catering-request-info">
-							<h4><?php echo esc_html( $location ); ?></h4>
-							<p class="restaurant-catering-request-date"><?php echo esc_html( $event_date ); ?> • <?php echo esc_html( $guest_count ); ?> <?php esc_html_e( 'guests', 'restaurant-food-services' ); ?></p>
-						</div>
-						<div class="restaurant-catering-request-meta">
-							<span class="restaurant-catering-status-badge restaurant-catering-status-badge--<?php echo esc_attr( $status ); ?>"><?php echo esc_html( $status_label ); ?></span>
-							<span class="restaurant-catering-request-price"><?php echo wp_kses_post( wc_price( $total_price ) ); ?></span>
-						</div>
-					</div>
-					<div class="restaurant-catering-request-actions">
-						<a href="<?php echo esc_url( $detail_url ); ?>" class="button button-small"><?php esc_html_e( 'View Details & Chat', 'restaurant-food-services' ); ?></a>
-					</div>
-				</div>
-			<?php endforeach; ?>
+		<div id="restaurant-catering-requests-container" class="restaurant-ajax-container" data-nonce="<?php echo esc_attr( wp_create_nonce( 'restaurant_catering_requests_ajax' ) ); ?>">
+			<?php $this->render_catering_requests_table_content( $query ); ?>
 		</div>
 		<?php
 
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * Renders the table content for catering requests.
+	 *
+	 * @param \WP_Query $query Catering request query.
+	 *
+	 * @return void
+	 */
+	protected function render_catering_requests_table_content( $query ) {
+		if ( ! $query->have_posts() ) {
+			echo '<p>' . esc_html__( 'No catering requests found.', 'restaurant-food-services' ) . '</p>';
+			return;
+		}
+		?>
+		<div class="restaurant-table-wrapper">
+			<table class="woocommerce-orders-table woocommerce-MyAccount-orders shop_table shop_table_responsive my_account_orders restaurant-catering-table">
+				<thead>
+					<tr>
+						<th><span class="nobr"><?php esc_html_e( 'Request ID', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Location', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Event Date', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Guests', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Status', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Total', 'restaurant-food-services' ); ?></span></th>
+						<th><span class="nobr"><?php esc_html_e( 'Actions', 'restaurant-food-services' ); ?></span></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php while ( $query->have_posts() ) : ?>
+						<?php
+						$query->the_post();
+						$request_id     = get_the_ID();
+						$location       = sanitize_text_field( (string) get_post_meta( $request_id, 'location', true ) );
+						$event_date     = sanitize_text_field( (string) get_post_meta( $request_id, 'event_date', true ) );
+						$guest_count    = absint( get_post_meta( $request_id, 'guest_count', true ) );
+						$status         = sanitize_key( (string) get_post_meta( $request_id, 'catering_status', true ) );
+						$total_price    = (float) get_post_meta( $request_id, 'total_price', true );
+
+						if ( empty( $status ) ) {
+							$status = 'pending';
+						}
+
+						$status_labels = array(
+							'pending'  => esc_html__( 'Pending Review', 'restaurant-food-services' ),
+							'approved' => esc_html__( 'Approved', 'restaurant-food-services' ),
+							'rejected' => esc_html__( 'Rejected', 'restaurant-food-services' ),
+						);
+
+						$status_label = isset( $status_labels[ $status ] ) ? $status_labels[ $status ] : esc_html__( 'Unknown', 'restaurant-food-services' );
+						$detail_url   = add_query_arg( 'catering_request', $request_id, home_url( '/my-account/my-catering-requests' ) );
+						?>
+						<tr class="woocommerce-orders-table__row">
+							<td class="woocommerce-orders-table__cell-order-number" data-title="<?php esc_attr_e( 'Request ID', 'restaurant-food-services' ); ?>">
+								<a href="<?php echo esc_url( $detail_url ); ?>">#<?php echo esc_html( (string) $request_id ); ?></a>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-location" data-title="<?php esc_attr_e( 'Location', 'restaurant-food-services' ); ?>">
+								<?php echo esc_html( $location ); ?>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-date" data-title="<?php esc_attr_e( 'Event Date', 'restaurant-food-services' ); ?>">
+								<?php echo esc_html( $event_date ); ?>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-guests" data-title="<?php esc_attr_e( 'Guests', 'restaurant-food-services' ); ?>">
+								<?php echo esc_html( (string) $guest_count ); ?>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-status" data-title="<?php esc_attr_e( 'Status', 'restaurant-food-services' ); ?>">
+								<span class="restaurant-catering-status-badge restaurant-catering-status-badge--<?php echo esc_attr( $status ); ?>"><?php echo esc_html( $status_label ); ?></span>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-total" data-title="<?php esc_attr_e( 'Total', 'restaurant-food-services' ); ?>">
+								<?php echo wp_kses_post( wc_price( $total_price ) ); ?>
+							</td>
+							<td class="woocommerce-orders-table__cell-order-actions" data-title="<?php esc_attr_e( 'Actions', 'restaurant-food-services' ); ?>">
+								<a href="<?php echo esc_url( $detail_url ); ?>" class="woocommerce-button button view"><?php esc_html_e( 'View Details', 'restaurant-food-services' ); ?></a>
+							</td>
+						</tr>
+					<?php endwhile; wp_reset_postdata(); ?>
+				</tbody>
+			</table>
+		</div>
+		<?php if ( $query->max_num_pages > 1 ) : ?>
+			<nav class="woocommerce-pagination woocommerce-pagination--without-numbers woocommerce-Pagination restaurant-pagination">
+				<?php
+				echo paginate_links( array(
+					'base'      => '#%#%',
+					'format'    => '?paged=%#%',
+					'current'   => max( 1, $query->get( 'paged' ) ),
+					'total'     => $query->max_num_pages,
+					'prev_text' => '&larr;',
+					'next_text' => '&rarr;',
+					'type'      => 'list',
+				) );
+				?>
+			</nav>
+		<?php endif; ?>
+		<?php
 	}
 
 	/**

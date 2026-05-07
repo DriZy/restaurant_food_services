@@ -103,6 +103,7 @@
 		this.reset();
 		this.bindEvents();
 		this.hydrateFromDraft();
+		this.restoreFromAuthRedirect();
 		this.syncUI();
 		this.toggleCustomOfferingSection();
 		this.updatePricePreview();
@@ -115,6 +116,52 @@
 				self.syncUI();
 			}
 		});
+
+		// Listen for auth redirect restoration
+		$(document).on('restaurant_restore_wizard_state', function(e, wizardType) {
+			if (wizardType === 'catering') {
+				self.restoreFromAuthRedirect();
+			}
+		});
+	};
+
+	CateringWizard.prototype.restoreFromAuthRedirect = function() {
+		if (!window.RestaurantAuthGuard) {
+			return;
+		}
+
+		var saved = window.RestaurantAuthGuard.getWizardState('catering');
+		if (!saved) {
+			return;
+		}
+
+		// Support both legacy plain-state and new {state, step} payloads
+		var savedState = saved.state ? saved.state : saved;
+		if (savedState) {
+			this.state = savedState;
+		}
+
+		if (saved && saved.step) {
+			this.currentStep = parseInt(saved.step, 10) || 1;
+		}
+
+		this.syncUI();
+		this.updateSidebar();
+
+		// Clear saved state
+		window.RestaurantAuthGuard.clearWizardState('catering');
+
+		// Show success message
+		var message = 'Welcome back! Your catering request has been restored.';
+		if (this.showSubmissionStatus) {
+			this.showSubmissionStatus(message, 'success', 3000);
+		}
+		if (window.RestaurantFoodServicesUI && window.RestaurantFoodServicesUI.showToast) {
+			window.RestaurantFoodServicesUI.showToast(message, 'success');
+		}
+
+		// Scroll to form
+		this.scrollToTop();
 	};
 
 	CateringWizard.prototype.reset = function () {
@@ -686,6 +733,14 @@
 		var cfg = this.getAjaxConfig();
 		var self = this;
 
+		// If the user is not authenticated, send them to /sign-up and preserve the current step/state.
+		if (window.RestaurantAuthGuard && !window.RestaurantAuthGuard.isUserAuthenticated()) {
+			var authGuard = window.RestaurantAuthGuard;
+			authGuard.saveWizardState('catering', { state: this.state, step: this.currentStep });
+			authGuard.redirectToAuth({ state: this.state, step: this.currentStep }, 'catering');
+			return;
+		}
+
 		if (!cfg.ajaxUrl || !cfg.cateringDraftNonce) {
 			notify('Unable to save draft right now.', 'error');
 			return;
@@ -701,6 +756,8 @@
 			data: {
 				action: 'restaurant_save_catering_draft',
 				nonce: cfg.cateringDraftNonce,
+				current_step: this.currentStep,
+				source_url: window.location.href,
 				event_type: this.state.eventType,
 				event_date: this.state.eventDate,
 				guest_count: this.state.guestCount,
@@ -714,23 +771,48 @@
 				dietary_requirements: this.state.dietaryNeeds,
 				dietary_needs: this.state.dietaryNeeds
 			}
-		})
-			.done(function (response) {
-				if (response && response.success) {
-					var message = (response.data && response.data.message) ? response.data.message : 'Draft saved successfully.';
-					self.showSubmissionStatus(message, 'success', 3000);
-					notify(message, 'success');
-					return;
+		}).done(function (response) {
+			if (response && response.success) {
+				var message = (response.data && response.data.message) ? response.data.message : 'Draft saved successfully.';
+				self.showSubmissionStatus(message, 'success', 3000);
+				notify(message, 'success');
+				return;
+			}
+
+			var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to save draft.';
+			self.showSubmissionStatus(errorMsg, 'error', 5000);
+			notify(errorMsg, 'error');
+		}).fail(function (draftFail) {
+			var responseJSON = draftFail && draftFail.responseJSON ? draftFail.responseJSON : null;
+			var responseData = responseJSON && responseJSON.data ? responseJSON.data : null;
+
+			// Handle authentication required
+			if (
+				draftFail && draftFail.status === 401 &&
+				responseData &&
+				responseData.auth_required &&
+				responseData.redirect_url
+			) {
+				var redirectUrl = responseData.redirect_url;
+
+				if (responseData.redirect_state_id) {
+					redirectUrl = redirectUrl + (redirectUrl.indexOf('?') > -1 ? '&' : '?') + 'restaurant_form_redirect=' + encodeURIComponent(responseData.redirect_state_id);
 				}
-				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to save draft.';
-				self.showSubmissionStatus(errorMsg, 'error', 5000);
-				notify(errorMsg, 'error');
-			})
-			.fail(function () {
-				var errorMsg = 'Unable to save draft right now. Please check your connection.';
-				self.showSubmissionStatus(errorMsg, 'error', 5000);
-				notify(errorMsg, 'error');
-			})
+
+				try {
+					localStorage.setItem('restaurant_catering_redirect_state', responseData.redirect_state_id || '');
+				} catch (storageError) {
+					// Ignore storage failures and continue redirecting.
+				}
+
+				window.location.href = redirectUrl;
+				return;
+			}
+
+			var errorMsg = (responseData && responseData.message) ? responseData.message : 'Unable to save draft right now. Please check your connection.';
+			self.showSubmissionStatus(errorMsg, 'error', 5000);
+			notify(errorMsg, 'error');
+		})
 			.always(function () {
 				self.$saveDraft.prop('disabled', false).removeClass('loading');
 			});
@@ -755,6 +837,16 @@
 		if (!this.validateStep(3)) {
 			this.currentStep = 3;
 			this.syncUI();
+			return;
+		}
+
+		// Check if user is authenticated before final submission
+		if (window.RestaurantAuthGuard && !window.RestaurantAuthGuard.isUserAuthenticated()) {
+			var authGuard = window.RestaurantAuthGuard;
+			// Save current state and step for restoration after login
+			authGuard.saveWizardState('catering', { state: this.state, step: this.currentStep });
+			// Show authentication modal
+			authGuard.showAuthModal('catering', this.currentStep);
 			return;
 		}
 
@@ -804,14 +896,51 @@
 					self.syncUI();
 					return;
 				}
-				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to submit request.';
-				self.showSubmissionStatus(errorMsg, 'error', 5000);
-				notify(errorMsg, 'error');
+				
+				// // Handle authentication required
+				// if (!response.success && response.data && response.data.auth_required && response.data.redirect_url) {
+				// 	var redirectUrl = response.data.redirect_url;
+				// 	if (response.data.redirect_state_id) {
+				// 		redirectUrl = redirectUrl + (redirectUrl.indexOf('?') > -1 ? '&' : '?') + 'restaurant_form_redirect=' + encodeURIComponent(response.data.redirect_state_id);
+				// 	}
+				// 	localStorage.setItem('restaurant_catering_redirect_state', response.data.redirect_state_id || '');
+				// 	window.location.href = redirectUrl;
+				// 	return;
+				// }
+				//
+				// var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Failed to submit request.';
+				// self.showSubmissionStatus(errorMsg, 'error', 5000);
+				// notify(errorMsg, 'error');
 			})
-			.fail(function () {
-				var errorMsg = 'Unable to submit request right now. Please check your connection.';
-				self.showSubmissionStatus(errorMsg, 'error', 5000);
-				notify(errorMsg, 'error');
+			.fail(function (jqXHR) {
+					var responseJSON = jqXHR && jqXHR.responseJSON ? jqXHR.responseJSON : null;
+					var responseData = responseJSON && responseJSON.data ? responseJSON.data : null;
+
+					// Handle authentication required
+					if (
+						jqXHR && jqXHR.status === 401 &&
+						responseData &&
+						responseData.auth_required &&
+						responseData.redirect_url
+					) {
+						var redirectUrl = responseData.redirect_url;
+
+						if (responseData.redirect_state_id) {
+							redirectUrl = redirectUrl + (redirectUrl.indexOf('?') > -1 ? '&' : '?') + 'restaurant_form_redirect=' + encodeURIComponent(responseData.redirect_state_id);
+						}
+
+						try {
+							localStorage.setItem('restaurant_meal_plan_redirect_state', responseData.redirect_state_id || '');
+						} catch (storageError) {
+							// Ignore storage failures and continue redirecting.
+						}
+
+						window.location.href = redirectUrl;
+						return;
+					}
+				// var errorMsg = 'Unable to submit request right now. Please check your connection.';
+				// self.showSubmissionStatus(errorMsg, 'error', 5000);
+				// notify(errorMsg, 'error');
 			})
 			.always(function () {
 				self.$submit.prop('disabled', false).removeClass('loading');

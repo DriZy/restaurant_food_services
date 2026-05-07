@@ -1,4 +1,4 @@
-(function() {
+(function($) {
 	'use strict';
 
 	// Ensure globals exist
@@ -41,7 +41,7 @@
 		e.preventDefault();
 
 		const form = e.target;
-		const messageinput = form.querySelector('textarea[name="comment"]');
+		const messageinput = form.querySelector('textarea[name="comment"], textarea[name="message"], input[name="message"]');
 		const messageText = messageinput ? messageinput.value.trim() : '';
 
 		// Validate message
@@ -51,7 +51,7 @@
 		}
 
 		// Find the post ID from the form
-		const postIdInput = form.querySelector('input[name="comment_post_ID"]');
+		const postIdInput = form.querySelector('input[name="comment_post_ID"], input[name="post_id"]');
 		const postId = postIdInput ? parseInt(postIdInput.value, 10) : 0;
 
 		if (!postId || postId <= 0) {
@@ -110,33 +110,75 @@
 	 * Send message via AJAX
 	 */
 	function sendMessageViaAjax(postId, message, form, callback) {
-		const formData = new FormData();
-		formData.append('action', 'restaurant_catering_send_message');
-		formData.append('nonce', nonce);
-		formData.append('post_id', postId);
-		formData.append('message', message);
-
-		fetch(ajaxUrl, {
-			method: 'POST',
-			body: formData,
-			credentials: 'same-origin'
-		})
-		.then(response => response.json())
-		.then(data => {
-			if (data.success) {
-				callback(true, data);
-			} else {
-				callback(false, data);
+		$.ajax({
+			url: ajaxUrl,
+			type: 'POST',
+			dataType: 'text',
+			data: {
+				action: 'restaurant_catering_send_message',
+				nonce: nonce,
+				post_id: postId,
+				comment_post_ID: postId,
+				message: message
 			}
-		})
-		.catch(error => {
-			console.error('AJAX Error:', error);
-			callback(false, {
-				data: {
-					message: 'An error occurred. Please try again.'
-				}
-			});
+		}).done(function(data) {
+			callbackFromResponse(callback, data);
+		}).fail(function(jqXHR) {
+			callbackFromResponse(callback, jqXHR && jqXHR.responseText ? jqXHR.responseText : '', true);
 		});
+	}
+
+	function callbackFromResponse(callback, rawResponse, isErrorResponse) {
+		const parsed = parseAjaxResponse(rawResponse);
+
+		if (parsed && parsed.success) {
+			callback(true, parsed);
+			return;
+		}
+
+		if (parsed) {
+			callback(false, parsed);
+			return;
+		}
+
+		callback(false, {
+			data: {
+				message: isErrorResponse ? 'An error occurred. Please try again.' : 'Failed to send message. Please try again.'
+			}
+		});
+	}
+
+	function parseAjaxResponse(rawResponse) {
+		if (!rawResponse) {
+			return null;
+		}
+
+		if (typeof rawResponse === 'object') {
+			return rawResponse;
+		}
+
+		if (typeof rawResponse !== 'string') {
+			return null;
+		}
+
+		const trimmed = rawResponse.trim();
+
+		try {
+			return JSON.parse(trimmed);
+		} catch (e) {
+			const start = trimmed.indexOf('{');
+			const end = trimmed.lastIndexOf('}');
+
+			if (start !== -1 && end !== -1 && end > start) {
+				try {
+					return JSON.parse(trimmed.slice(start, end + 1));
+				} catch (nestedError) {
+					return null;
+				}
+			}
+
+			return null;
+		}
 	}
 
 	/**
@@ -285,5 +327,5 @@
 		initCateringChatAjax();
 	}
 
-})();
+})(jQuery);
 

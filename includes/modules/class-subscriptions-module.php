@@ -97,7 +97,10 @@ class Subscriptions_Module extends Abstract_Module {
 		$user_id    = (int) $order->get_user_id();
 		$created_count = 0;
 		$this->maybe_add_plan_type_column( $table_name );
+		$this->maybe_add_weekly_menu_id_column( $table_name );
 		$this->maybe_add_location_data_column( $table_name );
+		$this->maybe_add_family_size_column( $table_name );
+		$this->maybe_add_delivery_time_slot_column( $table_name );
 
 		foreach ( $order->get_items() as $item ) {
 			$product_id = (int) $item->get_product_id();
@@ -171,11 +174,17 @@ class Subscriptions_Module extends Abstract_Module {
 			return;
 		}
 
+		// Ensure all necessary columns exist
+		$this->maybe_add_family_size_column( $table_name );
+		$this->maybe_add_delivery_time_slot_column( $table_name );
+
 		$weekly_menu_id = isset( $selection['weekly_menu_id'] ) ? absint( $selection['weekly_menu_id'] ) : 0;
-		$selected_meals = isset( $selection['selected_meals'] ) && is_array( $selection['selected_meals'] ) ? array_map( 'absint', $selection['selected_meals'] ) : array();
+		$selected_meals = isset( $selection['selected_meals'] ) && is_array( $selection['selected_meals'] ) ? $selection['selected_meals'] : array();
 		$delivery_days  = $this->normalize_delivery_days_to_sunday( isset( $selection['delivery_days'] ) && is_array( $selection['delivery_days'] ) ? array_map( 'sanitize_text_field', $selection['delivery_days'] ) : array() );
 		$meals_per_week = isset( $selection['meals_per_week'] ) ? absint( $selection['meals_per_week'] ) : 0;
 		$plan_type      = isset( $selection['plan_type'] ) ? sanitize_text_field( $selection['plan_type'] ) : 'individual';
+		$family_size    = isset( $selection['family_size'] ) ? absint( $selection['family_size'] ) : 1;
+		$delivery_time  = isset( $selection['delivery_time'] ) ? sanitize_text_field( $selection['delivery_time'] ) : 'morning';
 		$location_data  = isset( $selection['delivery_location_data'] ) && is_array( $selection['delivery_location_data'] ) ? $this->sanitize_location_data( $selection['delivery_location_data'] ) : array(
 			'formatted_address' => '',
 			'latitude'          => 0.0,
@@ -195,19 +204,21 @@ class Subscriptions_Module extends Abstract_Module {
 		$inserted = $wpdb->insert(
 			$table_name,
 			array(
-				'user_id'         => $user_id,
-				'plan_id'         => 0,
-				'weekly_menu_id'  => $weekly_menu_id,
-				'plan_type'       => $plan_type,
-				'meals_per_week'  => $meals_per_week,
-				'selected_meals'  => wp_json_encode( $selected_meals ),
-				'delivery_days'   => wp_json_encode( $delivery_days ),
-				'location_data'   => wp_json_encode( $location_data ),
-				'status'          => 'active',
-				'next_order_date' => $this->extract_next_order_date( $order ),
-				'created_at'      => current_time( 'mysql', true ),
+				'user_id'               => $user_id,
+				'plan_id'               => 0,
+				'weekly_menu_id'        => $weekly_menu_id,
+				'plan_type'             => $plan_type,
+				'family_size'           => $family_size,
+				'meals_per_week'        => $meals_per_week,
+				'selected_meals'        => wp_json_encode( $selected_meals ),
+				'delivery_days'         => wp_json_encode( $delivery_days ),
+				'delivery_time_slot'    => $delivery_time,
+				'location_data'         => wp_json_encode( $location_data ),
+				'status'                => 'active',
+				'next_order_date'       => $this->extract_next_order_date( $order ),
+				'created_at'            => current_time( 'mysql', true ),
 			),
-			array( '%d', '%d', '%d', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
+			array( '%d', '%d', '%d', '%s', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s' )
 		);
 
 		if ( false !== $inserted && $wpdb->insert_id > 0 ) {
@@ -285,6 +296,54 @@ class Subscriptions_Module extends Abstract_Module {
 		}
 
 		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN location_data longtext NULL AFTER delivery_days" );
+	}
+
+	/**
+	 * Ensures the subscriptions table includes family_size column.
+	 *
+	 * @param string $table_name Subscriptions table name.
+	 *
+	 * @return void
+	 */
+	protected function maybe_add_family_size_column( $table_name ) {
+		global $wpdb;
+
+		$column = $wpdb->get_var(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM {$table_name} LIKE %s",
+				'family_size'
+			)
+		);
+
+		if ( ! empty( $column ) ) {
+			return;
+		}
+
+		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN family_size int(11) NOT NULL DEFAULT 1 AFTER plan_type" );
+	}
+
+	/**
+	 * Ensures the subscriptions table includes delivery_time_slot column.
+	 *
+	 * @param string $table_name Subscriptions table name.
+	 *
+	 * @return void
+	 */
+	protected function maybe_add_delivery_time_slot_column( $table_name ) {
+		global $wpdb;
+
+		$column = $wpdb->get_var(
+			$wpdb->prepare(
+				"SHOW COLUMNS FROM {$table_name} LIKE %s",
+				'delivery_time_slot'
+			)
+		);
+
+		if ( ! empty( $column ) ) {
+			return;
+		}
+
+		$wpdb->query( "ALTER TABLE {$table_name} ADD COLUMN delivery_time_slot varchar(50) NOT NULL DEFAULT 'morning' AFTER delivery_days" );
 	}
 
 	/**

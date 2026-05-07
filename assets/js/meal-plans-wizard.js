@@ -89,6 +89,7 @@
 
 		this.reset();
 		this.bindEvents();
+		this.restoreFromAuthRedirect();
 		this.syncUI();
 		this.updateSidebar();
 
@@ -99,6 +100,54 @@
 				self.syncUI();
 			}
 		});
+
+		// Listen for auth redirect restoration
+		$(document).on('restaurant_restore_wizard_state', function(e, wizardType) {
+			if (wizardType === 'meal_plans') {
+				self.restoreFromAuthRedirect();
+			}
+		});
+	};
+
+	MealPlansWizard.prototype.restoreFromAuthRedirect = function() {
+		if (!window.RestaurantAuthGuard) {
+			return;
+		}
+
+		var saved = window.RestaurantAuthGuard.getWizardState('meal_plans');
+		if (!saved) {
+			return;
+		}
+
+		// Support both legacy plain-state and new {state, step} payloads
+		var savedState = saved.state ? saved.state : saved;
+		var savedStep = saved.step ? parseInt(saved.step, 10) || 1 : (saved.step === 0 ? 0 : (saved.step ? parseInt(saved.step, 10) : (saved.state && saved.state.step ? parseInt(saved.state.step, 10) : 1)));
+
+		if (savedState) {
+			this.state = savedState;
+		}
+
+		if (saved && saved.step) {
+			this.currentStep = parseInt(saved.step, 10) || 1;
+		}
+
+		this.syncUI();
+		this.updateSidebar();
+
+		// Clear saved state
+		window.RestaurantAuthGuard.clearWizardState('meal_plans');
+
+		// Show success message
+		var message = 'Welcome back! Your meal plan configuration has been restored.';
+		if (this.showSubmissionStatus) {
+			this.showSubmissionStatus(message, 'success', 3000);
+		}
+		if (window.RestaurantFoodServicesUI && window.RestaurantFoodServicesUI.showToast) {
+			window.RestaurantFoodServicesUI.showToast(message, 'success');
+		}
+
+		// Scroll to form and show current step
+		this.scrollToTop();
 	};
 
 	MealPlansWizard.prototype.reset = function () {
@@ -544,6 +593,16 @@
 			return;
 		}
 
+		// Check if user is authenticated before final submission
+		if (window.RestaurantAuthGuard && !window.RestaurantAuthGuard.isUserAuthenticated()) {
+			var authGuard = window.RestaurantAuthGuard;
+			// Save current state and step for restoration after login
+			authGuard.saveWizardState('meal_plans', { state: this.state, step: this.currentStep });
+			// Show authentication modal
+			authGuard.showAuthModal('meal_plans', this.currentStep);
+			return;
+		}
+
 		if (!cfg.ajaxUrl || !cfg.mealPlanSubmitNonce) {
 			notify('Unable to submit meal plan right now.', 'error');
 			return;
@@ -571,35 +630,60 @@
 				delivery_days: this.state.deliveryDays,
 				delivery_time: this.state.deliveryTime
 			}
-		})
-			.done(function (response) {
-				if (response && response.success) {
-					var message = (response.data && response.data.message) ? response.data.message : 'Meal plan saved successfully.';
-					self.showSubmissionStatus(message, 'success', 3000);
-					notify(message, 'success');
-					
-					if (response.data && typeof response.data.cart_count !== 'undefined') {
-						setCartCount(response.data.cart_count);
-					}
-					
-					var checkoutUrl = response.data && response.data.checkout_url;
-					
-					self.reset();
-					self.syncUI();
+		}).done(function (response) {
+			if (response && response.success) {
+				var message = (response.data && response.data.message) ? response.data.message : 'Meal plan saved successfully.';
+				self.showSubmissionStatus(message, 'success', 3000);
+				notify(message, 'success');
 
-					if (checkoutUrl) {
-						setTimeout(function() {
-							window.location.href = checkoutUrl;
-						}, 2000);
+				if (response.data && typeof response.data.cart_count !== 'undefined') {
+					setCartCount(response.data.cart_count);
+				}
+
+				var checkoutUrl = response.data && response.data.checkout_url;
+
+				self.reset();
+				self.syncUI();
+
+				if (checkoutUrl) {
+					setTimeout(function () {
+						window.location.href = checkoutUrl;
+					}, 2000);
+				}
+				return;
+			}
+
+			var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Unable to submit meal plan.';
+			self.showSubmissionStatus(errorMsg, 'error', 5000);
+			notify(errorMsg, 'error');
+		}).fail(function (jqXHR) {
+				var responseJSON = jqXHR && jqXHR.responseJSON ? jqXHR.responseJSON : null;
+				var responseData = responseJSON && responseJSON.data ? responseJSON.data : null;
+
+				// Handle authentication required
+				if (
+					jqXHR && jqXHR.status === 401 &&
+					responseData &&
+					responseData.auth_required &&
+					responseData.redirect_url
+				) {
+					var redirectUrl = responseData.redirect_url;
+
+					if (responseData.redirect_state_id) {
+						redirectUrl = redirectUrl + (redirectUrl.indexOf('?') > -1 ? '&' : '?') + 'restaurant_form_redirect=' + encodeURIComponent(responseData.redirect_state_id);
 					}
+
+					try {
+						localStorage.setItem('restaurant_meal_plan_redirect_state', responseData.redirect_state_id || '');
+					} catch (storageError) {
+						// Ignore storage failures and continue redirecting.
+					}
+
+					window.location.href = redirectUrl;
 					return;
 				}
-				var errorMsg = (response && response.data && response.data.message) ? response.data.message : 'Unable to submit meal plan.';
-				self.showSubmissionStatus(errorMsg, 'error', 5000);
-				notify(errorMsg, 'error');
-			})
-			.fail(function () {
-				var errorMsg = 'Unable to submit meal plan right now. Please check your connection.';
+
+				var errorMsg = (responseData && responseData.message) ? responseData.message : 'Unable to submit meal plan.';
 				self.showSubmissionStatus(errorMsg, 'error', 5000);
 				notify(errorMsg, 'error');
 			})
